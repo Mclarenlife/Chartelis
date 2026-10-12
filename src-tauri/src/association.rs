@@ -11,13 +11,16 @@ pub fn configure_markdown_default() -> Result<String, String> {
 #[cfg(windows)]
 mod platform {
     use std::os::windows::process::CommandExt;
-    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+    use winreg::{enums::{HKEY_CURRENT_USER, HKEY_CLASSES_ROOT}, RegKey};
     const PROG_ID: &str = "Chartelis.Markdown";
     pub fn is_default() -> bool {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let value = hkcu.open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.md\UserChoice")
             .and_then(|key| key.get_value::<String, _>("ProgId"));
-        value.is_ok_and(|id| id == PROG_ID || id == "Chartelis.md" || id == "Applications\\chartelis.exe")
+        // With no explicit UserChoice, Windows falls back to the registered
+        // extension handler (for example immediately after installation).
+        let value = value.or_else(|_| RegKey::predef(HKEY_CLASSES_ROOT).open_subkey(".md").and_then(|key| key.get_value::<String, _>("")));
+        value.is_ok_and(|id| id == PROG_ID || id == "Applications\\chartelis.exe")
     }
     pub fn configure() -> Result<String, Box<dyn std::error::Error>> {
         let exe = std::env::current_exe()?;
