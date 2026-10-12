@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Chartelis export verification</title></head>
+<body><p>Isolated export verification</p><script type="module">
+import '/src/styles.css';
+import '/node_modules/katex/dist/katex.min.css';
+import { visualBlob, wordBlob } from '/src/export.ts';
+window.exportSample = async (markdown, format) => {
+  const blob = format === 'docx' ? await wordBlob(markdown, '导出验证') : await visualBlob(markdown, format, '导出验证');
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader(); reader.onerror = reject;
+    reader.onload = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(blob);
+  });
+};
+</script></body></html>

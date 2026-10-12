@@ -1,0 +1,37 @@
+.editor-mount { min-height: 310px; }
+.milkdown .ProseMirror { outline: none; white-space: pre-wrap; overflow-wrap: break-word; font-size: var(--editor-font-size, 17px); line-height: 1.95; letter-spacing: .25px; color: var(--text); min-height: 300px; caret-color: var(--gold); }
+.font-serif .ProseMirror { font-family: 'Songti SC', 'Noto Serif CJK SC', 'SimSun', Georgia, serif; }
+.font-sans .ProseMirror { font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif; }
+.ProseMirror ::selection { background: #adab7e40; }
+.ProseMirror > :first-child { margin-top: 0; }
+.ProseMirror h1 { font-size: 2.2em; font-weight: 500; line-height: 1.5; letter-spacing: 1px; margin: 0 0 19px; }
+.ProseMirror h1 + p { color: var(--muted); font-size: .94em; margin-bottom: 30px; }
+.ProseMirror h2 { font-weight: 600; font-size: 1.17em; line-height: 1.6; margin: 32px 0 13px; }
+.ProseMirror h3 { font-weight: 600; font-size: 1.06em; margin: 26px 0 12px; }
+.ProseMirror h4, .ProseMirror h5, .ProseMirror h6 { font-size: 1em; margin: 22px 0 10px; }
+.ProseMirror p { margin: 0 0 17px; }
+.ProseMirror strong { font-weight: 700; }
+.ProseMirror blockquote { border-left: 2px solid var(--gold); padding: 5px 0 5px 22px; margin: 25px 0 29px; color: var(--accent); font-style: normal; }
+.ProseMirror blockquote p { margin: 0; }
+.ProseMirror ul, .ProseMirror ol { padding-left: 23px; margin: 16px 0 21px; }
+.ProseMirror li { padding-left: 3px; margin: 8px 0; }
+.ProseMirror li::marker { color: var(--accent); font-size: .8em; }
+.ProseMirror li p { margin: 0; }
+.ProseMirror li ul, .ProseMirror li ol { margin: 6px 0; }
+.ProseMirror hr { height: 1px; border: none; background: var(--line); margin: 28px 0; }
+.ProseMirror a { color: var(--accent); text-decoration-color: var(--gold); text-underline-offset: 4px; }
+.ProseMirror code { font: .83em/1.7 'Cascadia Code', 'SFMono-Regular', Consolas, monospace; border-radius: 4px; padding: 3px 6px; background: var(--accent-soft); color: var(--accent); }
+.ProseMirror pre { background: var(--sidebar); padding: 19px 22px; border: 1px solid var(--line); border-radius: 7px; white-space: pre; overflow-x: auto; margin: 21px 0; }
+.ProseMirror pre code { background: transparent; color: var(--text); border-radius: 0; padding: 0; }
+.ProseMirror img { max-width: 100%; border-radius: 5px; }
+.ProseMirror table { border-collapse: collapse; width: 100%; margin: 22px 0; font-size: .9em; }
+.ProseMirror th, .ProseMirror td { border: 1px solid var(--line); min-width: 80px; padding: 9px 13px; position: relative; }
+.ProseMirror th { background: var(--sidebar); font-weight: 600; }
+.ProseMirror td p, .ProseMirror th p { margin: 0; }
+.ProseMirror .selectedCell::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: #adab7e30; }
+.ProseMirror li[data-item-type='task'] { list-style-type: none; position: relative; }
+.ProseMirror li[data-item-type='task']::before { content: '□'; color: var(--accent); position: absolute; left: -20px; }
+.ProseMirror li[data-checked='true']::before { content: '☑'; }
+.ProseMirror li[data-checked='true'] > p { color: var(--muted); text-decoration: line-through; }
+.ProseMirror .empty-editor::before { content: attr(data-placeholder); color: var(--subtle); float: left; height: 0; pointer-events: none; font-size: .94em; }
+.ProseMirror .ProseMirror-selectednode { outline: 2px solid var(--gold); }

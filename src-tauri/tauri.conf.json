@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Chartelis",
+  "version": "0.1.0",
+  "identifier": "com.chartelis.editor",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Chartelis",
+        "width": 1280,
+        "height": 880,
+        "minWidth": 720,
+        "minHeight": 540,
+        "center": true,
+        "backgroundColor": "#faf9f6",
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https: data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "fileAssociations": [{ "ext": ["md", "markdown", "mdown"], "name": "Markdown", "description": "Markdown 文稿", "role": "Editor", "rank": "Alternate", "mimeType": "text/markdown", "contentTypes": ["net.daringfireball.markdown"] }],
+    "shortDescription": "留白之间，自在书写",
+    "longDescription": "Chartelis is a minimal, local-first Markdown editor for Windows and macOS.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "windows": { "nsis": { "displayLanguageSelector": true, "languages": ["SimpChinese", "English"] } },
+    "macOS": { "minimumSystemVersion": "12.0", "infoPlist": "Info.plist" }
+  }
+}
