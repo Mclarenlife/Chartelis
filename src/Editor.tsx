@@ -9,14 +9,14 @@ import { toggleMark } from '@milkdown/kit/prose/commands';
 import { $prose, callCommand, insert } from '@milkdown/kit/utils';
 import { highlightMark, highlightRemark } from './highlight';
 import { mathPlugins } from './math';
-import { defaultToolbar, toolbarOptions } from './preferences';
+import { defaultToolbar } from './preferences';
+import FormatToolbar from './FormatToolbar';
 import { richFocus } from './rich-focus';
 import { formatSource, type FormatAction, type FormatValue } from './formatting';
 import type { CursorState } from './workspace';
 import { Plugin, TextSelection, AllSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet, type EditorView } from '@milkdown/kit/prose/view';
 import { AnimatePresence, motion } from 'motion/react';
-import { Bold, Italic, Strikethrough, Code2, Heading2, Quote, Highlighter, Link, List, Sigma, SquareFunction } from 'lucide-react';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 
 export interface Heading { text: string; level: number; pos: number }
@@ -116,7 +116,7 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
         const scrollRect = host.closest('.writing-scroll')!.getBoundingClientRect();
         if (start.top < scrollRect.top + 8 || start.top > scrollRect.bottom) { setBubble(null); return; }
         const marks = Object.keys(view.state.schema.marks).filter(name => doc.rangeHasMark(selection.from, selection.to, view.state.schema.marks[name]));
-        const halfWidth = Math.min((callbacks.current.toolbar ?? defaultToolbar).length * 36 + 22, window.innerWidth - 24) / 2 + 8;
+        const halfWidth = Math.min((callbacks.current.toolbar ?? defaultToolbar).length * 41 + 9, window.innerWidth - 24) / 2 + 8;
         setBubble({ x: Math.max(halfWidth, Math.min(window.innerWidth - halfWidth, (start.left + end.right) / 2)), y: Math.max(scrollRect.top + 8, start.top - 54), marks });
       });
     };
@@ -196,19 +196,14 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
     };
   }, []);
 
-  const icons = { bold: Bold, italic: Italic, strike: Strikethrough, inlineCode: Code2, h2: Heading2, quote: Quote, highlight: Highlighter, link: Link, bullet: List, mathInline: Sigma, mathBlock: SquareFunction };
-  const marks: Record<string, string> = { bold: 'strong', italic: 'emphasis', strike: 'strike_through', inlineCode: 'inlineCode', highlight: 'highlight' };
-  const actions = (props.toolbar ?? defaultToolbar).flatMap(id => {
-    const option = toolbarOptions.find(([key]) => key === id);
-    return option ? [{ id, label: option[1], icon: icons[id as keyof typeof icons], mark: marks[id] || '' }] : [];
-  });
+  const actions = props.toolbar ?? defaultToolbar;
 
   return <>
     <div className={`editor-mount ${ready ? 'is-ready' : ''}`} ref={mount} />
     {!ready && <div className="editor-loading">正在铺开稿纸…</div>}
     <AnimatePresence>
-      {bubble && props.active && !props.readOnly && actions.length > 0 && <motion.div className="floating-toolbar" role="toolbar" aria-label="文字格式" style={{ left: bubble.x, top: bubble.y }} initial={{ opacity: 0, y: 5, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 3, scale: .98 }} transition={{ duration: .16 }}>
-        {actions.map(({ id, label, icon: Icon, mark }, index) => <button key={label} className={`${bubble.marks.includes(mark) ? 'active' : ''} ${index === 4 ? 'tool-divider' : ''}`} title={label} aria-label={label} aria-pressed={mark ? bubble.marks.includes(mark) : undefined} onMouseDown={event => event.preventDefault()} onClick={() => props.onFormat?.(id)}><Icon size={17} strokeWidth={1.7} /></button>)}
+      {bubble && props.active && !props.readOnly && actions.length > 0 && <motion.div className="floating-toolbar" style={{ left: bubble.x, top: bubble.y, x: '-50%' }} initial={{ opacity: 0, y: 5, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 3, scale: .98 }} transition={{ duration: .16 }}>
+        <FormatToolbar actions={actions} marks={bubble.marks} onSelect={action => props.onFormat?.(action)} />
       </motion.div>}
     </AnimatePresence>
   </>;
