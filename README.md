@@ -17,17 +17,19 @@
 
 ## 菜单、偏好与公式
 
-- 侧栏顶部为「文件 / 编辑 / 视图 / 帮助」四宫格菜单，设置按钮位于品牌右侧。
+- LOGO、名称、设置和「文件 / 编辑 / 视图 / 帮助」菜单统一放在顶栏。
+- 文件菜单可打开、关闭文件夹；左侧文稿列表仅在打开文件夹后显示，支持子目录浏览和刷新。未打开文件夹时，可用「快速打开」或 `Ctrl/Cmd + P` 切换已打开的文稿。
 - 文稿列表支持简洁 / 详细两种显示；详细模式显示两行正文摘要。
 - 标准外观：亮色、暗色、跟随系统。跟随系统实时响应外观变化；可选配色为晨光、苔绿、雾蓝、玫瑰、深海。偏好随重启恢复。
 - 设置中可配置 Markdown 默认打开应用。支持 Explorer / Finder 打开 `.md`、`.markdown`、`.mdown`，已打开文稿会复用编辑会话，保留未保存内容。
 - 选区浮动工具栏可在设置中通过同款图标工具栏实时预览，点选图标后调整顺序或移除，下方图标面板切换显示的工具；全部移除即可隐藏。
 - 右键 Markdown 格式菜单使用分组图标网格，悬停可查看名称，支持方向键操作。
 - 顶栏导出按钮位于保存右侧；“视图 → 显示顶栏”可以隐藏或恢复顶栏，并记住重启前的选择。“另存为”保留在文件菜单及快捷键中。
+- 顶栏或底栏隐藏后，编辑区左上角或左下角显示悬浮展开按钮；两栏的显示偏好都会保存。
 - 原生窗口标题显示 `Chartelis - 当前文件名`。
 - 文件菜单支持新建、打开、文件夹内逐级浏览、最近文件、快速切换、磁盘重新加载（可撤销）、保存全部、属性、导出与关闭。
 - 编辑菜单支持撤销重做、剪切复制粘贴、复制全文 Markdown/HTML、全选、格式与公式插入、源码查找替换。视图包含侧栏、大纲、只读、专注、状态栏、全屏、原生窗口置顶、字号。
-- 帮助内置 Markdown 与 LaTeX 语法表，LaTeX 示例包含渲染效果。
+- 帮助内置 Markdown 与 LaTeX 语法表，LaTeX 示例包含渲染效果；字符表支持按名称、符号或 Unicode 搜索、复制和插入。
 - 使用 `$E=mc^2$` 写行内公式，或以独占一行的 `$$` 包围独立公式。点击公式修改源码，Esc 或 Ctrl/Cmd + Enter 返回正文。KaTeX 和字体打包在应用中，离线可用。
 - 支持 [KaTeX 数学语法](https://katex.org/docs/supported)，不包含完整 `.tex` 文档编译。PDF/PNG 渲染公式；Word 将行内与独立公式转换成原生 Office Math（OMML），支持分式、上下标、根式、求和、积分、矩阵、分段、重音与上下横线。无效公式或不支持的 MathML 结构会明确报错，不会静默替换为源码。
 
@@ -74,6 +76,8 @@ pnpm desktop:build --bundles dmg   # macOS，需在 Mac 上执行
 
 启动开发服务器后，可运行 `node e2e/verify-toolbar-ui.mjs`，验证工具栏预览与真实选区一致、右键格式操作保留选区、导出入口及顶栏显示偏好恢复。测试使用独立浏览器上下文，不修改正在使用的工作区。
 
+`node e2e/verify-layout-folders.mjs` 验证紧凑顶栏、字符插入与撤销、文件夹浏览、草稿保护、文稿快速切换及顶栏/底栏的悬浮恢复入口。
+
 Windows 输出位于 `src-tauri/target/release/bundle/nsis/`。
 
 项目包含 `.github/workflows/build.yml`：Windows NSIS，以及同时兼容 Intel / Apple Silicon 的 macOS universal DMG 构建。工作流只生成构建产物，不发布 release。macOS 使用 ad-hoc 签名作为原型构建配置；正式分发需配置 Developer ID 签名与公证。Windows 原型未配置代码签名。
@@ -86,7 +90,9 @@ src/Editor.tsx           Milkdown 生命周期、选区工具栏、大纲
 src/SourceEditor.tsx     CodeMirror 源码编辑、选区与历史
 src/DocumentSession.tsx  每篇文稿的双视图、模式同步、位置恢复
 src/workspace.ts         工作区持久化、校验和旧草稿迁移
-src/AppMenu.tsx          四宫格菜单与次级菜单
+src/AppMenu.tsx          顶栏应用菜单与次级菜单
+src/CharacterSheet.tsx   字符搜索、复制与插入
+src/folders.ts           桌面与浏览器文件夹访问
 src/Settings.tsx         配色、摘要与工具栏配置
 src/math.ts              LaTeX 解析、节点编辑与离线渲染
 src/ReferenceSheet.tsx   Markdown / LaTeX 语法表
@@ -137,7 +143,17 @@ public/icon.png          原始软件图标
 - Windows 重启验证：未保存内容、源码模式与光标恢复，原文件未被自动覆盖；重启后仍能保存到已授权路径。
 - Windows 导出验证：PDF、PNG、DOCX 均通过系统对话框写入磁盘；PDF/PNG 渲染核对中文、表格、高亮与代码，DOCX 核对可编辑文本、表格与样式。
 
-本项目目前为 0.1.2 原型；请先在副本文稿上体验。
+本项目目前为 0.1.3 原型；请先在副本文稿上体验。
+
+## 本地插件（API v1）
+
+设置中的「插件管理」支持导入 JSON 插件包、查看内容、确认安装/替换、启用、停用和卸载；状态在本机重启后恢复。可安装内置「写作工具箱」试用石墨主题、日记/会议模板和选区文字命令。
+
+- 主题：设置 → 插件主题；停用当前主题所属插件后回到跟随系统。
+- 模板：文件 → 从模板新建，生成独立的未保存草稿。
+- 选区命令：编辑 → 插件选区命令，支持源码与预览模式，操作可撤销，只读时禁用。
+
+开发方式与限制见 [PLUGINS.md](PLUGINS.md)，可直接修改 [示例插件](examples/plugins/writing-kit.chartelis-plugin.json) 后重新导入。首版不执行第三方脚本，也未接入在线插件市场。
 
 ### 导出验证与限制
 

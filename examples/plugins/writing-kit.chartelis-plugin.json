@@ -1,0 +1,22 @@
+{
+  "apiVersion": 1,
+  "id": "chartelis.writing-kit",
+  "name": "写作工具箱",
+  "version": "1.0.0",
+  "author": "Chartelis",
+  "description": "石墨主题、日记与会议模板，以及常用文字整理命令。",
+  "themes": [{
+    "id": "graphite", "name": "石墨", "appearance": "dark",
+    "colors": { "paper": "#25272b", "sidebar": "#202226", "text": "#e5e4e0", "muted": "#a4a5aa", "subtle": "#85868e", "line": "#393c43", "hover": "#34373d", "selected": "#41454d", "accent": "#c6af89", "accent-soft": "#3e3831", "gold": "#c6af89", "surface": "#2e3035" }
+  }],
+  "templates": [
+    { "id": "journal", "name": "每日记录", "filename": "日记-{{date}}.md", "markdown": "# {{date}}\n\n## 今天的想法\n\n\n\n## 值得记住的事\n\n- \n\n## 明天\n\n- [ ] \n" },
+    { "id": "meeting", "name": "会议纪要", "filename": "会议纪要-{{date}}.md", "markdown": "# 会议纪要\n\n日期：{{date}} {{time}}\n\n## 议题\n\n- \n\n## 决定\n\n\n\n## 待办\n\n| 事项 | 负责人 | 截止日期 |\n| --- | --- | --- |\n| | | |\n" }
+  ],
+  "commands": [
+    { "id": "uppercase", "name": "转为大写", "operation": "uppercase" },
+    { "id": "lowercase", "name": "转为小写", "operation": "lowercase" },
+    { "id": "quote", "name": "加中文引号", "operation": "wrap", "before": "“", "after": "”" },
+    { "id": "trim", "name": "清理首尾空白", "operation": "trim" }
+  ]
+}

@@ -50,8 +50,7 @@ try {
   await page.reload();
   await expect(page.locator('.topbar')).toBeHidden();
   await expect(page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true })).toContainText('Toolbar selection test');
-  await page.getByRole('button', { name: '视图', exact: true }).click();
-  await page.getByRole('menuitemcheckbox', { name: '显示顶栏', exact: true }).click();
+  await page.getByRole('button', { name: '展开顶栏', exact: true }).click();
   await expect(page.locator('.topbar')).toBeVisible();
   assert.deepEqual(errors, []);
   console.log('PASS: preview matches live toolbar, order persists, formatting preserves selection, context grid keyboard navigation, export button, persisted topbar visibility.');

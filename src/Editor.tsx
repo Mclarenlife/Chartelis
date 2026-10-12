@@ -47,7 +47,7 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
 
   useImperativeHandle(ref, () => ({
     selectionText: () => instance.current?.action(ctx => { const view = ctx.get(editorViewCtx); return view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, '\n'); }) ?? '',
-    replaceSelection: text => instance.current?.action(ctx => { if (callbacks.current.readOnly) return; const view = ctx.get(editorViewCtx); view.dispatch(closeHistory(view.state.tr).insertText(text)); view.focus(); }),
+    replaceSelection: text => instance.current?.action(ctx => { if (callbacks.current.readOnly) return; const view = ctx.get(editorViewCtx); view.dispatch(closeHistory(view.state.tr).insertText(text)); view.dispatch(closeHistory(view.state.tr)); view.focus(); }),
     selectAll: () => instance.current?.action(ctx => { const view = ctx.get(editorViewCtx); view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc))); view.focus(); }),
     getCursor: () => instance.current?.action(ctx => { const { anchor, head } = ctx.get(editorViewCtx).state.selection; return { anchor, head }; }) ?? { anchor: 0, head: 0 },
     setCursor: cursor => instance.current?.action(ctx => {

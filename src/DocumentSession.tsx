@@ -6,7 +6,7 @@ import type { FormatAction } from './formatting';
 import FormatMenu, { LinkDialog } from './FormatMenu';
 
 export type EditorMode = 'preview' | 'source';
-export interface SessionHandle { selectionText(): string; replaceSelection(text: string): void; selectAll(): void; format(action: FormatAction): void; search(): void; replaceMarkdown(text: string): void; getMarkdown(): string; setMode(mode: EditorMode): void; scrollTo(pos: number): void; snapshot(): SessionSnapshot; undo(): void; redo(): void; history(): { undo: boolean; redo: boolean } }
+export interface SessionHandle { focus(): void; selectionText(): string; replaceSelection(text: string): void; selectAll(): void; format(action: FormatAction): void; search(): void; replaceMarkdown(text: string): void; getMarkdown(): string; setMode(mode: EditorMode): void; scrollTo(pos: number): void; snapshot(): SessionSnapshot; undo(): void; redo(): void; history(): { undo: boolean; redo: boolean } }
 interface Props {
   initialValue: string; active: boolean; font: string;
   readOnly?: boolean; toolbar?: FormatAction[];
@@ -64,6 +64,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
     else (modeRef.current === 'source' ? source.current : rich.current)?.format(action);
   };
   useImperativeHandle(ref, () => ({
+    focus: () => (modeRef.current === 'source' ? source.current : rich.current)?.focus(),
     selectionText: () => (modeRef.current === 'source' ? source.current : rich.current)?.selectionText() ?? '',
     replaceSelection: text => { if (!callbacks.current.readOnly) (modeRef.current === 'source' ? source.current : rich.current)?.replaceSelection(text); },
     selectAll: () => (modeRef.current === 'source' ? source.current : rich.current)?.selectAll(),

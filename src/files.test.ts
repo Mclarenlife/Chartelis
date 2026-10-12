@@ -1,14 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDocument } from './document';
 
-const mocks = vi.hoisted(() => ({ open: vi.fn(), save: vi.fn(), readTextFile: vi.fn(), writeTextFile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ open: vi.fn(), save: vi.fn(), readTextFile: vi.fn(), writeTextFile: vi.fn(), readDir: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.open, save: mocks.save }));
-vi.mock('@tauri-apps/plugin-fs', () => ({ readTextFile: mocks.readTextFile, writeTextFile: mocks.writeTextFile }));
+vi.mock('@tauri-apps/plugin-fs', () => ({ readTextFile: mocks.readTextFile, writeTextFile: mocks.writeTextFile, readDir: mocks.readDir }));
 import { ExternalChangeError, openDocument, saveDocument } from './files';
+import { chooseWorkspaceFolder, readWorkspaceFolder, openWorkspaceFile } from './folders';
 
 beforeEach(() => vi.resetAllMocks());
 describe('native file adapter', () => {
+  it('browses only Markdown/text and directories under the selected folder, then opens a document', async () => {
+    mocks.open.mockResolvedValue('C:\\文稿');
+    mocks.readDir.mockResolvedValue([
+      { name: '今天.md', isDirectory: false },
+      { name: '图片.png', isDirectory: false },
+      { name: '链接.md', isSymlink: true },
+      { name: '归档', isDirectory: true },
+    ]);
+    const root = await chooseWorkspaceFolder();
+    expect(root).toEqual({ name: '文稿', path: 'C:\\文稿' });
+    expect(mocks.open).toHaveBeenCalledWith(expect.objectContaining({ directory: true, recursive: true }));
+    const folder = await readWorkspaceFolder([root!]);
+    expect(mocks.readDir).toHaveBeenCalledWith(root!.path);
+    expect(folder.items.map(item => item.name)).toEqual(['归档', '今天.md']);
+    mocks.readTextFile.mockResolvedValue('# 今天');
+    expect(await openWorkspaceFile(folder.items[1])).toMatchObject({ name: '今天.md', path: 'C:\\文稿/今天.md', diskContent: '# 今天' });
+  });
+  it('does not read a directory when the folder picker is cancelled', async () => {
+    mocks.open.mockResolvedValue(null);
+    expect(await chooseWorkspaceFolder()).toBeNull();
+    expect(mocks.readDir).not.toHaveBeenCalled();
+  });
   it('opens a user-selected Unicode path and records the on-disk baseline', async () => {
     mocks.open.mockResolvedValue('C:\\文稿\\今天.md');
     mocks.readTextFile.mockResolvedValue('# 你好\r\n');
