@@ -18,9 +18,10 @@ import { Plugin, TextSelection, AllSelection } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet, type EditorView } from '@milkdown/kit/prose/view';
 import { AnimatePresence, motion } from 'motion/react';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
+import { findRich, richSearch, richHighlights, searchKey, scrollSearch, type SearchEditor } from './search';
 
 export interface Heading { text: string; level: number; pos: number }
-export interface EditorHandle { selectionText(): string; replaceSelection(text: string): void; selectAll(): void; getMarkdown(): string; replaceMarkdown(markdown: string): string; focus(): void; scrollTo(pos: number): void;
+export interface EditorHandle extends SearchEditor { selectionText(): string; replaceSelection(text: string): void; selectAll(): void; getMarkdown(): string; replaceMarkdown(markdown: string): string; focus(): void; scrollTo(pos: number): void;
   getCursor(): CursorState; setCursor(cursor: CursorState): void; undo(): void; redo(): void; history(): { undo: boolean; redo: boolean }; format(action: FormatAction, value?: FormatValue): void;
 }
 interface Props {
@@ -46,6 +47,18 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
   useEffect(() => { instance.current?.action(ctx => { const view = ctx.get(editorViewCtx); view.dispatch(view.state.tr.setMeta('focus-refresh', true)); }); }, [props.focusMode, props.active, props.readOnly]);
 
   useImperativeHandle(ref, () => ({
+    find: (query, sensitive) => instance.current?.action(ctx => findRich(ctx.get(editorViewCtx).state.doc, query, sensitive)) ?? [],
+    highlight: (matches, index, scroll) => instance.current?.action(ctx => {
+      const view = ctx.get(editorViewCtx);
+      view.dispatch(view.state.tr.setMeta(searchKey, richHighlights(view.state.doc, matches, index)));
+      if (scroll && matches[index]) scrollSearch(view.dom, view.coordsAtPos(matches[index].from).top);
+    }),
+    replaceMatches: (matches, text) => instance.current?.action(ctx => {
+      if (callbacks.current.readOnly || !matches.length) return;
+      const view = ctx.get(editorViewCtx); let tr = closeHistory(view.state.tr);
+      for (const match of [...matches].reverse()) tr = tr.insertText(text, match.from, match.to);
+      view.dispatch(tr); view.dispatch(closeHistory(view.state.tr));
+    }),
     selectionText: () => instance.current?.action(ctx => { const view = ctx.get(editorViewCtx); return view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, '\n'); }) ?? '',
     replaceSelection: text => instance.current?.action(ctx => { if (callbacks.current.readOnly) return; const view = ctx.get(editorViewCtx); view.dispatch(closeHistory(view.state.tr).insertText(text)); view.dispatch(closeHistory(view.state.tr)); view.focus(); }),
     selectAll: () => instance.current?.action(ctx => { const view = ctx.get(editorViewCtx); view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc))); view.focus(); }),
@@ -177,7 +190,7 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
       ctx.set(defaultValueCtx, props.initialValue.replace(/^\uFEFF/, ''));
       ctx.update(editorViewOptionsCtx, options => ({ ...options, editable: () => !cancelled && !callbacks.current.readOnly }));
       ctx.update(remarkStringifyOptionsCtx, options => ({ ...options, handlers: { ...options.handlers, highlight: (node: any, _parent: any, state: any, info: any) => '==' + state.containerPhrasing(node, info) + '==' } }));
-    }).use(commonmark).use(gfm).use(history).use(clipboard).use(mathPlugins).use(highlightRemark).use(highlightMark).use(ui).use(richFocus(() => !!callbacks.current.focusMode && callbacks.current.active));
+    }).use(commonmark).use(gfm).use(history).use(clipboard).use(mathPlugins).use(highlightRemark).use(highlightMark).use(ui).use($prose(() => richSearch)).use(richFocus(() => !!callbacks.current.focusMode && callbacks.current.active));
 
     const creation = editor.create().then(() => {
       if (cancelled) return;

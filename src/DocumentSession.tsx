@@ -4,6 +4,7 @@ import SourceEditor, { type SourceHandle } from './SourceEditor';
 import { emptySession, type SessionSnapshot } from './workspace';
 import type { FormatAction } from './formatting';
 import FormatMenu, { LinkDialog } from './FormatMenu';
+import SearchBar from './SearchBar';
 
 export type EditorMode = 'preview' | 'source';
 export interface SessionHandle { focus(): void; selectionText(): string; replaceSelection(text: string): void; selectAll(): void; format(action: FormatAction): void; search(): void; replaceMarkdown(text: string): void; getMarkdown(): string; setMode(mode: EditorMode): void; scrollTo(pos: number): void; snapshot(): SessionSnapshot; undo(): void; redo(): void; history(): { undo: boolean; redo: boolean } }
@@ -26,7 +27,11 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
   const modeRef = useRef<EditorMode>(initial.current.mode);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [linkDialog, setLinkDialog] = useState<'link' | 'image' | null>(null);
-  const pendingSearch = useRef(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchOpenRef = useRef(false);
+  searchOpenRef.current = searchOpen;
+  const [searchFocus, setSearchFocus] = useState(0);
+  const [revision, setRevision] = useState(0);
   const closeMenu = useCallback(() => setMenu(null), []);
   const rich = useRef<EditorHandle>(null);
   const source = useRef<SourceHandle>(null);
@@ -47,14 +52,16 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
   const publishOutline = useCallback(() => {
     if (callbacks.current.active) callbacks.current.onOutline(modeRef.current === 'source' ? source.current?.getHeadings() ?? [] : outline.current);
   }, []);
+  const searchEditor = useCallback(() => mode === 'source' ? source.current : rich.current, [mode]);
   const change = (markdown: string) => {
+    setRevision(value => value + 1);
     canonical.current = markdown;
     callbacks.current.onChange(markdown);
   };
   const restore = useCallback(() => {
     const scroller = modeRef.current === 'source' ? sourceScroll.current : richScroll.current;
     if (!callbacks.current.active || !scroller) return;
-    if (!document.querySelector('dialog[open]')) (modeRef.current === 'source' ? source.current : rich.current)?.focus();
+    if (!document.querySelector('dialog[open]') && !searchOpenRef.current) (modeRef.current === 'source' ? source.current : rich.current)?.focus();
     scroller.scrollTop = scrolls.current[modeRef.current];
   }, []);
 
@@ -69,8 +76,8 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
     replaceSelection: text => { if (!callbacks.current.readOnly) (modeRef.current === 'source' ? source.current : rich.current)?.replaceSelection(text); },
     selectAll: () => (modeRef.current === 'source' ? source.current : rich.current)?.selectAll(),
     format,
-    search() { pendingSearch.current = true; if (modeRef.current === 'source' && source.current) { source.current.search(); pendingSearch.current = false; } else this.setMode('source'); },
-    replaceMarkdown(text) { rich.current?.replaceMarkdown(text); source.current?.replaceMarkdown(text); canonical.current = text; richInput.current = text; richBaseline.current = rich.current?.getMarkdown() ?? text; richOrigins.current.set(richBaseline.current, text); sourceOrigins.current.set(text.replace(/\r\n?/g, '\n'), text); callbacks.current.onChange(text); publishOutline(); },
+    search() { setSearchOpen(true); setSearchFocus(value => value + 1); },
+    replaceMarkdown(text) { setRevision(value => value + 1); rich.current?.replaceMarkdown(text); source.current?.replaceMarkdown(text); canonical.current = text; richInput.current = text; richBaseline.current = rich.current?.getMarkdown() ?? text; richOrigins.current.set(richBaseline.current, text); sourceOrigins.current.set(text.replace(/\r\n?/g, '\n'), text); callbacks.current.onChange(text); publishOutline(); },
     snapshot: () => ({ mode: modeRef.current, preview: { cursor: rich.current?.getCursor() ?? initial.current.preview.cursor, scroll: scrolls.current.preview }, source: { cursor: source.current?.getCursor() ?? initial.current.source.cursor, scroll: scrolls.current.source } }),
     undo: () => !callbacks.current.readOnly && (modeRef.current === 'source' ? source.current : rich.current)?.undo(),
     redo: () => !callbacks.current.readOnly && (modeRef.current === 'source' ? source.current : rich.current)?.redo(),
@@ -106,7 +113,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
     closeMenu();
     callbacks.current.onMode(mode);
     publishOutline();
-    const frame = requestAnimationFrame(() => { restore(); if (pendingSearch.current && mode === 'source' && source.current) { source.current.search(); pendingSearch.current = false; } });
+    const frame = requestAnimationFrame(() => { restore(); });
     return () => cancelAnimationFrame(frame);
   }, [props.active, mode, ready, restore, publishOutline]);
 
@@ -115,6 +122,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
     if (!(event.target as HTMLElement).closest('[contenteditable]')) return;
     event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY });
   }}>
+    {searchOpen && props.active && <SearchBar editor={searchEditor} revision={revision + Number(ready)} readOnly={props.readOnly} focusRequest={searchFocus} onClose={() => { setSearchOpen(false); searchEditor()?.highlight([], 0, false); (modeRef.current === 'source' ? source.current : rich.current)?.focus(); }} />}
     <div className="writing-scroll" hidden={mode !== 'preview'} ref={richScroll} onScroll={event => {
       if (props.active && mode === 'preview') { scrolls.current.preview = event.currentTarget.scrollTop; callbacks.current.onState?.(); }
     }}>
@@ -139,7 +147,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
     }}>
       {sourceCreated && <SourceEditor ref={source} initialValue={canonical.current}
         readOnly={props.readOnly} focusMode={props.focusMode} active={props.active && mode === 'source'} onState={props.onState}
-        onReady={() => { source.current?.setCursor(initial.current.source.cursor); publishOutline(); requestAnimationFrame(restore); }}
+        onReady={() => { source.current?.setCursor(initial.current.source.cursor); setRevision(value => value + 1); publishOutline(); requestAnimationFrame(restore); }}
         onChange={markdown => { change(sourceOrigins.current.get(markdown) ?? markdown); publishOutline(); }} />}
     </div>
     {menu && props.active && <FormatMenu {...menu} onClose={closeMenu} onSelect={action => { format(action); closeMenu(); }} />}

@@ -1,5 +1,5 @@
 .editor-mount { min-height: 310px; }
-.milkdown .ProseMirror { outline: none; white-space: pre-wrap; overflow-wrap: break-word; font-size: var(--editor-font-size, 17px); line-height: 1.95; letter-spacing: .25px; color: var(--text); min-height: 300px; caret-color: var(--gold); }
+.milkdown .ProseMirror { outline: none; white-space: pre-wrap; overflow-wrap: break-word; font-size: var(--editor-font-size, 17px); line-height: var(--writing-line, 1.95); letter-spacing: var(--writing-spacing, .25px); color: var(--writing-color, var(--text)); min-height: 300px; caret-color: var(--gold); }
 .font-serif .ProseMirror { font-family: 'Songti SC', 'Noto Serif CJK SC', 'SimSun', Georgia, serif; }
 .font-sans .ProseMirror { font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif; }
 .ProseMirror ::selection { background: #adab7e40; }

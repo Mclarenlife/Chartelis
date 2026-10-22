@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { openSearchPanel, search, searchKeymap } from '@codemirror/search';
+import { findText, type SearchEditor } from './search';
 import { StateEffect, StateField, EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, Decoration, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, historyKeymap, undo, redo, undoDepth, redoDepth, isolateHistory } from '@codemirror/commands';
@@ -10,6 +10,12 @@ import type { CursorState } from './workspace';
 import { formatSource, type FormatAction, type FormatValue } from './formatting';
 import { visualLineRange } from './focus-line';
 
+const searchEffect = StateEffect.define<DecorationSet>();
+const searchField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update: (value, tr) => tr.effects.find(effect => effect.is(searchEffect))?.value as DecorationSet ?? value.map(tr.changes),
+  provide: field => EditorView.decorations.from(field),
+});
 const focusEffect = StateEffect.define<DecorationSet>();
 const focusField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -17,7 +23,7 @@ const focusField = StateField.define<DecorationSet>({
   provide: field => EditorView.decorations.from(field),
 });
 
-export interface SourceHandle { selectionText(): string; replaceSelection(text: string): void; selectAll(): void; search(): void;
+export interface SourceHandle extends SearchEditor { selectionText(): string; replaceSelection(text: string): void; selectAll(): void;
   getMarkdown(): string;
   replaceMarkdown(markdown: string): void;
   getHeadings(): Heading[];
@@ -41,7 +47,16 @@ const SourceEditor = forwardRef<SourceHandle, Props>(function SourceEditor(props
     selectionText: () => { const view = instance.current; return view ? view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to) : ''; },
     replaceSelection: text => { const view = instance.current; if (view && !callbacks.current.readOnly) { view.dispatch(view.state.replaceSelection(text), { annotations: isolateHistory.of('full'), scrollIntoView: true }); view.focus(); } },
     selectAll: () => { const view = instance.current; if (view) { view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } }); view.focus(); } },
-    search: () => { if (instance.current) openSearchPanel(instance.current); },
+    find: (query, sensitive) => findText(instance.current?.state.doc.toString() ?? '', query, sensitive),
+    highlight: (matches, index, scroll) => {
+      const view = instance.current; if (!view) return;
+      view.dispatch({ effects: searchEffect.of(Decoration.set(matches.map((match, i) => Decoration.mark({ class: i === index ? 'search-hit search-current' : 'search-hit' }).range(match.from, match.to)))) });
+      if (scroll && matches[index]) view.dispatch({ effects: EditorView.scrollIntoView(matches[index].from, { y: 'center' }) });
+    },
+    replaceMatches: (matches, text) => {
+      const view = instance.current; if (!view || callbacks.current.readOnly || !matches.length) return;
+      view.dispatch({ changes: matches.map(match => ({ ...match, insert: text })), annotations: isolateHistory.of('full') });
+    },
     getCursor: () => { const selection = instance.current?.state.selection.main; return { anchor: selection?.anchor ?? 0, head: selection?.head ?? 0 }; },
     setCursor: cursor => { const view = instance.current; if (view) view.dispatch({ selection: { anchor: Math.min(view.state.doc.length, cursor.anchor), head: Math.min(view.state.doc.length, cursor.head) } }); },
     undo: () => { if (instance.current) { undo(instance.current); instance.current.focus(); } },
@@ -75,10 +90,10 @@ const SourceEditor = forwardRef<SourceHandle, Props>(function SourceEditor(props
     let frame = 0, last = '';
     const base = createSourceState(props.initialValue);
     const state = base.update({ effects: StateEffect.appendConfig.of([
-      editable.current.of(EditorState.readOnly.of(!!props.readOnly)), search({ top: true }),
+      editable.current.of(EditorState.readOnly.of(!!props.readOnly)), searchField,
       lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), focusField,
       bracketMatching(), syntaxHighlighting(defaultHighlightStyle), EditorView.lineWrapping,
-      keymap.of([{ key: 'Mod-Shift-z', run: redo }, ...searchKeymap, ...historyKeymap, ...defaultKeymap]),
+      keymap.of([{ key: 'Mod-Shift-z', run: redo }, ...historyKeymap, ...defaultKeymap]),
       EditorView.contentAttributes.of({ 'aria-label': 'Markdown 源码编辑器', spellcheck: 'false' }),
       EditorView.updateListener.of(update => {
         if (update.docChanged && !syncing.current) callbacks.current.onChange(update.state.doc.toString());

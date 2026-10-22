@@ -1,3 +1,4 @@
+import { writingThemes, inkOptions, writingColor } from './writing-preferences';
 import { themes } from './preferences';
 import ToolbarSettings from './ToolbarSettings';
 import type { FormatAction } from './formatting';
@@ -10,11 +11,13 @@ interface Props {
   fontSize: number; setFontSize(value: number): void; outline: string; setOutline(value: string): void;
   listStyle: string; setListStyle(value: string): void; toolbar: FormatAction[]; setToolbar(value: FormatAction[]): void;
   plugins: PluginManager;
+  writingTheme: string; setWritingTheme(id: string): void; ink: string; setInk(id: string): void; dark: boolean;
 }
 export default function Settings(props: Props) {
   return <div className="settings-content">
     <section><h3>外观</h3><div className="appearance-options" aria-label="标准外观">{[['light', '亮色'], ['dark', '暗色'], ['system', '跟随系统']].map(([id, label]) => <button key={id} className={props.theme === id ? 'selected' : ''} aria-pressed={props.theme === id} onClick={() => props.setTheme(id)}>{label}</button>)}</div><p className="settings-note">跟随系统会随设备的亮色、暗色设置自动切换。</p></section>
     <section><h3>其他配色 <small>可选</small></h3><div className="theme-grid">{themes.map(theme => <button key={theme.id} className={props.theme === theme.id ? 'selected' : ''} aria-pressed={props.theme === theme.id} onClick={() => props.setTheme(theme.id)}><span className="theme-swatch" style={{ background: theme.colors[0] }}><i style={{ background: theme.colors[1] }} /><i style={{ background: theme.colors[2] }} /></span>{theme.name}</button>)}</div></section>
+    <section className="writing-theme-settings"><h3>排版主题</h3><p className="settings-note">独立调整正文排版，不改变外观和界面配色。选定后可继续微调字体、字号与文字颜色。</p><div className="writing-theme-grid" aria-label="排版主题">{writingThemes.map(item => <button key={item.id} aria-pressed={props.writingTheme === item.id} onClick={() => props.setWritingTheme(item.id)}><span className={"theme-sample font-" + item.font} style={{ color: writingColor(item.ink, props.dark), fontSize: item.size }}>留白之间<br /><small>自在书写 Aa</small></span><strong>{item.name}</strong><small>{item.description}</small></button>)}</div></section>
     <FileAssociationSetting />
     {props.plugins.plugins.some(plugin => plugin.enabled && plugin.manifest.themes.length) && <section><h3>插件主题</h3><div className="theme-grid">{props.plugins.plugins.filter(plugin => plugin.enabled).flatMap(({ manifest }) => manifest.themes.map(theme => {
       const id = pluginThemeId(manifest.id, theme.id);
@@ -25,6 +28,7 @@ export default function Settings(props: Props) {
     <div className="setting-row"><span>大纲位置</span><div className="segmented">{[['left', '左侧栏'], ['right', '右侧栏']].map(([id, label]) => <button key={id} className={props.outline === id ? 'selected' : ''} onClick={() => props.setOutline(id)}>{label}</button>)}</div></div>
     <div className="setting-row"><span>正文字体</span><div className="segmented"><button className={props.font === 'serif' ? 'selected' : ''} onClick={() => props.setFont('serif')}>人文宋体</button><button className={props.font === 'sans' ? 'selected' : ''} onClick={() => props.setFont('sans')}>简洁黑体</button></div></div>
     <div className="setting-row"><label htmlFor="font-size">文字大小</label><input id="font-size" type="range" min="13" max="28" value={props.fontSize} onChange={event => props.setFontSize(Number(event.target.value))} /><span>{props.fontSize}</span></div>
+    <div className="setting-row"><span>正文颜色</span><div className="ink-options">{inkOptions.map(item => <button key={item.id} aria-label={item.name} aria-pressed={props.ink === item.id} onClick={() => props.setInk(item.id)}><i style={{ background: writingColor(item.id, props.dark) }} />{item.name}</button>)}</div></div>
     <ToolbarSettings toolbar={props.toolbar} setToolbar={props.setToolbar} />
   </div>;
 }
