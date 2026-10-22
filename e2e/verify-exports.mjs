@@ -65,5 +65,5 @@ try {
     console.log(`${format}: ${bytes.length} bytes, ${Date.now() - start} ms`);
   }
   assert.deepEqual(errors, []);
-  assert.equal(await page.locator('.export-document').count(), 0, 'temporary export surfaces are removed');
+  assert.equal(await page.locator('.preview-export').count(), 0, 'temporary export surfaces are removed');
 } finally { await browser.close(); }

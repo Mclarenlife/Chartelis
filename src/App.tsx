@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Check, CircleHelp, FileText, FolderOpen, ScanLine, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Settings2, Sun, X, Undo2, Redo2, Download, Code2, Eye, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import AppMenu, { type MenuGroups } from './AppMenu';
 import Settings from './Settings';
+import { capturePreview } from './preview-export';
+import { macDesktop } from './platform';
 import CountSettings from './CountSettings';
 import { writingThemes, writingColor, parseCount, countText, countLabels } from './writing-preferences';
 import ReferenceSheet from './ReferenceSheet';
@@ -139,8 +141,9 @@ export default function App() {
     flush(); const snapshot = docsRef.current.find(doc => doc.id === activeRef.current)!;
     busyRef.current = true; setBusy(true);
     try {
+      const preview = capturePreview(sessions.current.get(snapshot.id)?.previewHTML() ?? '', font);
       const { exportDocument } = await import('./export');
-      if (await exportDocument(snapshot, format)) { setModal(null); notify('文稿已导出'); }
+      if (await exportDocument(snapshot, format, preview)) { setModal(null); notify('文稿已导出'); }
     } catch (error) { if (!isCancelled(error)) notify(`导出失败：${String(error)}`, true); }
     finally { busyRef.current = false; setBusy(false); }
   };
@@ -434,9 +437,10 @@ export default function App() {
     };
   }, [notify]);
 
-  return <div className={`app ${focusMode ? 'focus-mode' : ''}`} style={{ '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
-      <header className="topbar" hidden={!topbarVisible}>
-        <div className="topbar-left">          <div className="brand"><img src="/icon.png" alt="Chartelis 图标" /><span className="brand-name">Chartelis<span className="brand-dot">.</span></span><button className="icon-button brand-settings" aria-label="设置" title="设置" onClick={() => setModal('settings')}><Settings2 size={16} /></button></div>
+  return <div className={`app ${macDesktop ? 'mac-desktop' : ''} ${focusMode ? 'focus-mode' : ''}`} style={{ '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
+      {macDesktop && !topbarVisible && <div className="mac-window-strip" data-tauri-drag-region><button className="icon-button" aria-label="展开顶栏" title="展开顶栏" onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button></div>}
+      <header className="topbar" hidden={!topbarVisible} data-tauri-drag-region={macDesktop ? true : undefined}>
+        <div className="topbar-left" data-tauri-drag-region={macDesktop ? true : undefined}>          <div className="brand" data-tauri-drag-region={macDesktop ? true : undefined}><img src="/icon.png" alt="Chartelis 图标" draggable={false} data-tauri-drag-region={macDesktop ? true : undefined} /><span className="brand-name" data-tauri-drag-region={macDesktop ? true : undefined}>Chartelis<span className="brand-dot" data-tauri-drag-region={macDesktop ? true : undefined}>.</span></span><button className="icon-button brand-settings" aria-label="设置" title="设置" onClick={() => setModal('settings')}><Settings2 size={16} /></button></div>
           <AppMenu groups={menus} />
 <button className="icon-button" aria-label="撤销" title={`撤销 · ${modKey} Z`} disabled={readOnly || !historyState.undo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.undo()}><Undo2 size={18} /></button><button className="icon-button" aria-label="重做" title={`重做 · ${modKey} Shift Z`} disabled={readOnly || !historyState.redo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.redo()}><Redo2 size={18} /></button></div>
         <div className="topbar-actions"><span className="save-state">{busy ? '处理中…' : isDirty(active) ? '尚未保存' : active.path || active.handle ? '已保存' : '本地草稿'}</span><button className="save-button" onClick={() => void saveFile()} disabled={busy} title={`保存 · ${modKey} S`}><Save size={15} /><span>保存</span></button><button className="icon-button" aria-label="导出文稿" title="导出 PDF、图片、Word" onClick={() => setModal('export')} disabled={busy}><Download size={17} /></button><span className="topbar-separator" /><button className={`icon-button ${focusMode ? 'is-active' : ''}`} aria-label={focusMode ? '退出专注模式' : '专注模式'} title={`专注模式 · ${modKey} Shift F`} onClick={() => setFocusMode(value => !value)}><ScanLine size={18} /></button><button className="icon-button" aria-label={darkTheme ? '切换浅色主题' : '切换深色主题'} onClick={() => setTheme(darkTheme ? 'light' : 'dark')}>{darkTheme ? <Sun size={18} /> : <Moon size={17} />}</button><button className="icon-button" aria-label="收起顶栏" title="收起顶栏" onClick={() => setTopbarVisible(false)}><ChevronUp size={17} /></button></div>
@@ -469,7 +473,7 @@ export default function App() {
     </AnimatePresence>
 
     <main className="main-panel">
-      {!topbarVisible && <button className="restore-bar restore-top" aria-label="展开顶栏" title="展开顶栏" onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button>}
+      {!topbarVisible && !macDesktop && <button className="restore-bar restore-top" aria-label="展开顶栏" title="展开顶栏" onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button>}
       {!statusVisible && <button className="restore-bar restore-bottom" aria-label="展开底栏" title="展开底栏" onClick={() => setStatusVisible(true)}><ChevronUp size={17} /></button>}
 
 
@@ -494,7 +498,7 @@ export default function App() {
     {modal === 'documents' && <Modal title="已打开的文稿" onClose={() => setModal(null)}><label className="search"><Search size={14} /><input autoFocus aria-label="快速查找文稿" placeholder="查找文稿…" value={search} onChange={event => setSearch(event.target.value)} /></label><div className="quick-documents">{docs.filter(doc => doc.name.toLowerCase().includes(search.toLowerCase())).map(doc => <button key={doc.id} onClick={() => { switchDocument(doc.id); setModal(null); }}><FileText size={16} /><span>{doc.name}</span>{isDirty(doc) && <i className="dirty-dot" aria-label="未保存" />}</button>)}</div></Modal>}
     {modal === 'reload' && <Modal title="从磁盘重新加载？" onClose={() => setModal(null)}><p>当前文稿有未保存修改。重新加载会替换编辑内容，此操作可撤销。</p><div className="modal-actions"><button className="secondary-button" onClick={() => setModal(null)}>取消</button><button className="primary-button" onClick={() => void reload()}>重新加载</button></div></Modal>}
     {modal === 'help' && <Modal title="让书写，顺手一点" onClose={() => setModal(null)}><p className="modal-description">使用 Markdown 语法，或选中文字唤出工具栏。</p><div className="shortcut-list">{[['新建文稿', `${modKey} N`], ['打开文稿', `${modKey} O`], ['保存', `${modKey} S`], ['另存为', `${modKey} Shift S`], ['切换侧栏', `${modKey} \\`], ['专注模式', `${modKey} Shift F`], ['加粗 / 斜体（预览）', `${modKey} B / I`], ['切换编辑模式', `${modKey} Shift M`], ['撤销', `${modKey} Z`], ['重做', `${modKey} Shift Z`]].map(([label, keys]) => <div key={label}><span>{label}</span><kbd>{keys}</kbd></div>)}</div><p className="settings-note">输入 # + 空格创建标题，&gt; + 空格创建引用。<br />未保存的修改会缓存为本地恢复草稿；请用“保存”写入文件。</p><div className="about-line"><img src="/icon.png" alt="" /><span>Chartelis <small>0.1.4 · 为专注而生</small></span></div></Modal>}
-    {modal === 'export' && <Modal title="导出文稿" onClose={() => { if (!busy) setModal(null); }}><p className="modal-description">导出当前内容，不改变 Markdown 原文件。</p><div className="export-options"><button disabled={busy} onClick={() => void exportFile('pdf')}>PDF 文档<small>A4 分页，文字可选中、可搜索</small></button><button disabled={busy} onClick={() => void exportFile('png')}>PNG 图片<small>浅色背景高清长图</small></button><button disabled={busy} onClick={() => void exportFile('docx')}>Word 文档<small>正文、表格与公式均可编辑</small></button></div>{busy && <p role="status" className="settings-note">正在生成导出文件…</p>}</Modal>}
+    {modal === 'export' && <Modal title="导出文稿" onClose={() => { if (!busy) setModal(null); }}><p className="modal-description">导出当前内容，不改变 Markdown 原文件。</p><div className="export-options"><button disabled={busy} onClick={() => void exportFile('pdf')}>PDF 文档<small>A4 分页，文字可选中、可搜索</small></button><button disabled={busy} onClick={() => void exportFile('png')}>PNG 图片<small>保留当前预览样式的高清长图</small></button><button disabled={busy} onClick={() => void exportFile('docx')}>Word 文档<small>正文、表格与公式均可编辑</small></button></div>{busy && <p role="status" className="settings-note">正在生成导出文件…</p>}</Modal>}
     {closeTarget && <Modal title="让这段灵感留下来？" onClose={() => { if (!busy) setCloseTarget(null); }}><p className="modal-description">{closeTarget === 'app' ? '还有文稿尚未保存。退出前，可以先把它们安放好。' : `“${docs.find(doc => doc.id === closeTarget)?.name}” 的修改尚未保存。`}</p><div className="modal-actions"><button className="text-button" disabled={busy} onClick={() => void finishClose(false)}>不保存</button><button className="secondary-button" disabled={busy} onClick={() => setCloseTarget(null)}>继续编辑</button><button className="primary-button" disabled={busy} onClick={() => void finishClose(true)}>{busy ? '保存中…' : closeTarget === 'app' ? '保存并退出' : '保存并关闭'}</button></div></Modal>}
   </div>;
 }

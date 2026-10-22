@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { formatGroups, linkMarkdown, type FormatAction, type FormatValue } from './formatting';
 import { FormatIcon } from './FormatToolbar';
+import { Pipette } from 'lucide-react';
+import { lastTextColor, rememberTextColor, textColors } from './text-color';
 
 export function LinkDialog({ action, onInsert, onClose }: { action: 'link' | 'image'; onInsert(value: FormatValue): void; onClose(): void }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -17,13 +19,17 @@ export function LinkDialog({ action, onInsert, onClose }: { action: 'link' | 'im
   </dialog>;
 }
 
-export default function FormatMenu({ x, y, onSelect, onClose }: { x: number; y: number; onSelect(action: FormatAction): void; onClose(): void }) {
+export default function FormatMenu({ x, y, onSelect, onColor, onClose }: { x: number; y: number; onSelect(action: FormatAction): void; onColor(color: string): void; onClose(): void }) {
   const menu = useRef<HTMLDivElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const [last] = useState(lastTextColor);
+  const [custom, setCustom] = useState<string | null>(null);
+  const applyColor = (color: string) => { rememberTextColor(color); onColor(color); };
   const [position, setPosition] = useState({ left: x, top: y });
   useLayoutEffect(() => {
     const bounds = menu.current!.getBoundingClientRect();
     setPosition({ left: Math.max(8, Math.min(x, window.innerWidth - bounds.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - bounds.height - 8)) });
-  }, [x, y]);
+  }, [x, y, custom]);
   useEffect(() => {
     menu.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
     const dismiss = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) onClose(); };
@@ -48,6 +54,11 @@ export default function FormatMenu({ x, y, onSelect, onClose }: { x: number; y: 
       }
     }
   }}>
+    <div className="format-group color-group" role="group" aria-label="颜色"><span aria-hidden="true">颜色</span><div className="color-swatches">
+      {[[`上次使用 ${last}`, last], ...textColors].map(([name, color], index) => <button key={name} className={index === 0 ? 'last-color' : ''} role="menuitem" tabIndex={-1} title={name} aria-label={name} onMouseDown={event => event.preventDefault()} onClick={() => applyColor(color)}><i style={{ backgroundColor: color }} /></button>)}
+      <button role="menuitem" tabIndex={-1} aria-label="自定义颜色" title="自定义颜色" onMouseDown={event => event.preventDefault()} onClick={() => picker.current?.click()}><Pipette size={16} /></button>
+      <input ref={picker} type="color" className="native-color-picker" aria-label="自定义文字颜色" value={custom ?? last} onChange={event => setCustom(event.target.value)} />
+    </div>{custom && <div className="custom-color-confirm"><i style={{ background: custom }} /><span>{custom.toUpperCase()}</span><button onClick={() => applyColor(custom)}>应用颜色</button></div>}</div>
     {formatGroups.map(group => <div className="format-group" key={group.label} role="group" aria-label={group.label}><span aria-hidden="true">{group.label}</span><div>{group.items.map(([action, label]) => <button key={action} role="menuitem" tabIndex={-1} aria-label={label} title={label} onMouseDown={event => event.preventDefault()} onClick={() => onSelect(action)}><FormatIcon action={action} /></button>)}</div></div>)}
   </div>;
 }

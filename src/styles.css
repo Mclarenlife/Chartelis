@@ -185,6 +185,14 @@ kbd { font-family: inherit; font-size: 10px; color: var(--muted); white-space: n
 .format-group { padding: 7px 5px; }
 .format-group + .format-group { border-top: 1px solid var(--line); }
 .format-group > span { display: block; font-size: 10px; color: var(--muted); margin: 0 6px 6px; }
+.format-group .color-swatches { display:grid; grid-template-columns:repeat(9, 1fr); gap:3px; }
+.color-swatches button { min-width:0; width:26px; height:30px; display:flex; align-items:center; justify-content:center; }
+.color-swatches i, .custom-color-confirm i { display:block; width:16px; height:16px; border-radius:4px; box-shadow:inset 0 0 0 1px #0000000d; }
+.color-swatches .last-color { margin-right:2px; box-shadow:inset -1px 0 var(--line); border-radius:0; }
+.native-color-picker { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.format-group .custom-color-confirm { display:flex; align-items:center; gap:8px; padding:8px 5px 2px; }
+.custom-color-confirm span { flex:1; font-size:10px; color:var(--muted); }
+.custom-color-confirm button { width:auto; font-size:11px; color:var(--accent); padding:4px 7px; }
 .format-group > div { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .format-menu button { display: flex; align-items: center; justify-content: center; height: 34px; padding: 0; border-radius: 5px; }
 .format-menu button:hover, .format-menu button:focus-visible { background: var(--accent-soft); outline: none; color: var(--accent); }
@@ -194,26 +202,6 @@ kbd { font-family: inherit; font-size: 10px; color: var(--muted); white-space: n
 .export-options button { padding: 15px; border: 1px solid var(--line); border-radius: 7px; text-align: left; font-size: 13px; }
 .export-options button:hover { background: var(--accent-soft); }
 .export-options small { display: block; margin-top: 7px; font-size: 11px; color: var(--muted); }
-.export-document { position: absolute; left: -10000px; top: 0; width: 816px; padding: 44px 48px; background: #fff; color: #333; font: 16px/1.85 'Microsoft YaHei', 'PingFang SC', sans-serif; overflow-wrap: anywhere; }
-.export-document h1 { font-size: 32px; line-height: 1.5; }
-.export-document h2 { font-size: 25px; }
-.export-document h3 { font-size: 20px; }
-.export-document h1, .export-document h2, .export-document h3 { margin: 24px 0 14px; }
-.export-document p { margin: 12px 0; }
-.export-document a { color: #626c4e; }
-.export-document blockquote { border-left: 3px solid #b09b77; margin: 22px 0; padding-left: 20px; color: #747565; }
-.export-document pre { padding: 18px; background: #f3f3ef; white-space: pre-wrap; }
-.export-document code { font-family: Consolas, monospace; background: #f3f3ef; }
-.export-document table { width: 100%; border-collapse: collapse; }
-.export-document th, .export-document td { border: 1px solid #ddd; padding: 9px; }
-.export-document th { background: #f3f3ef; }
-.export-document img { max-width: 100%; }
-.export-document mark { background: #f3e59f; }
-.export-document[data-pdf] { font-family: ChartelisExport, sans-serif; font-kerning: none; font-variant-ligatures: none; }
-.export-document[data-pdf] code { font-family: KaTeX_Typewriter, ChartelisExport, monospace; }
-.export-document[data-pdf] li { list-style: none; position: relative; }
-.pdf-list-marker { position: absolute; right: calc(100% + 6px); white-space: pre; }
-.export-document[data-pdf] pre { tab-size: 4; }
 @media (max-width: 1000px) { .right-outline { width: 170px; padding: 20px 8px; } }
 .floating-toolbar { position: fixed; z-index: 20; max-width: calc(100vw - 24px); }
 .format-toolbar { display: flex; width: max-content; max-width: 100%; flex-wrap: wrap; justify-content: center; gap: 3px; padding: 5px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: 0 5px 22px #20241918, 0 1px 3px #2024190a; }
@@ -319,6 +307,20 @@ input[type='range'] { accent-color: var(--accent); width: 165px; margin-left: au
 .detailed .document-select > svg { margin-top:1px; }
 .detailed .dirty-dot { margin-top:6px; }
 .statusbar[hidden], .topbar[hidden] { display:none; }
+/* Native macOS traffic lights share the 48px application header. */
+.mac-desktop .topbar { padding-left:94px; user-select:none; }
+.mac-window-strip { flex:0 0 var(--header-height); display:flex; align-items:center; padding-left:94px; background:var(--paper); user-select:none; }
+.mac-window-strip .icon-button { width:30px; height:30px; }
+@media (max-width:900px) {
+  .mac-desktop .brand-name { font-size:21px; }
+  .mac-desktop .brand { gap:5px; }
+  .mac-desktop .brand img { width:25px; height:25px; }
+  .mac-desktop .topbar-left { gap:3px; }
+  .mac-desktop .app-menu-bar > button { padding:0 7px; }
+  .mac-desktop .topbar-actions { gap:3px; }
+  .mac-desktop .save-button { padding:8px; }
+  .mac-desktop .save-button span { display:none; }
+}
 .modal { max-height:calc(100dvh - 60px); overflow:auto; }
 .modal:has(.settings-content) { width:570px; }
 .modal:has(.reference-sheet) { width:min(850px,calc(100vw - 60px)); }

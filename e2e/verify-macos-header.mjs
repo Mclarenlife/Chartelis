@@ -1,0 +1,34 @@
+import { chromium, expect } from '@playwright/test';
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 880 } });
+  // Exercise the Mac layout in isolation; native controls are verified on macOS.
+  await page.route('**/src/platform.ts*', route => route.fulfill({ contentType: 'application/javascript', body: 'export const macDesktop = true; export const nativeDialogTitle = () => undefined;' }));
+  await page.goto('http://127.0.0.1:1420/');
+  await expect(page.locator('.mac-desktop .topbar')).toBeVisible();
+  for (const width of [1280, 900, 720]) {
+    await page.setViewportSize({ width, height: 880 });
+    const boxes = await page.locator('.topbar').evaluate(header => {
+      const brand = header.querySelector('.brand').getBoundingClientRect();
+      const left = header.querySelector('.topbar-left').getBoundingClientRect();
+      const actions = header.querySelector('.topbar-actions').getBoundingClientRect();
+      return { height: header.getBoundingClientRect().height, brandLeft: brand.left, leftEnd: left.right, actionsStart: actions.left, actionsEnd: actions.right };
+    });
+    expect(boxes.height).toBe(48); expect(boxes.brandLeft).toBeGreaterThanOrEqual(90);
+    expect(boxes.leftEnd).toBeLessThanOrEqual(boxes.actionsStart);
+    expect(boxes.actionsEnd).toBeLessThanOrEqual(width);
+    await page.getByRole('button', { name: '设置', exact: true }).click();
+    await expect(page.getByRole('button', { name: '关闭对话框' })).toBeVisible();
+    await page.getByRole('button', { name: '关闭对话框' }).click();
+  }
+  await page.screenshot({ path: 'artifacts/mac-header-720.png' });
+  await page.getByRole('button', { name: '收起顶栏', exact: true }).click();
+  await expect(page.locator('.topbar')).toBeHidden();
+  await expect(page.locator('.mac-window-strip')).toHaveCSS('height', '48px');
+  await page.reload();
+  await expect(page.locator('.mac-window-strip')).toBeVisible();
+  await page.getByRole('button', { name: '展开顶栏', exact: true }).click();
+  await expect(page.locator('.topbar')).toBeVisible();
+  expect(await page.locator('button[data-tauri-drag-region]').count()).toBe(0);
+  console.log('PASS: Mac traffic-light space, compact responsive header, clickable settings, collapse/restore persistence; native AppKit interaction requires a Mac.');
+} finally { await browser.close(); }

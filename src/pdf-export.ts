@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, degrees, type PDFFont } from 'pdf-lib';
+import { PDFDocument, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, type PDFFont } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import html2canvas from 'html2canvas';
 
@@ -37,49 +37,14 @@ export function paginate(height: number, capacity: number, blocks: KeepTogether[
 }
 
 interface TextLine extends KeepTogether {
-  text: string; left: number; baseline: number; size: number;
+  text: string; width: number; left: number; baseline: number; size: number;
   family: string; bold: boolean; italic: boolean; color: number[];
 }
 
-/** DOM provides wrapping and equation layout; PDF stores real glyphs, not a text screenshot. */
+/** The browser supplies the visual layer; selectable text is positioned over it. */
 export async function textPdf(surface: HTMLElement, title: string): Promise<Blob> {
   const base = import.meta.env.BASE_URL;
   const regularUrl = `${base}fonts/NotoSansSC-Regular.ttf`, boldUrl = `${base}fonts/NotoSansSC-Bold.ttf`;
-  await Promise.all([[regularUrl, '400'], [boldUrl, '700']].map(async ([url, weight]) => {
-    if (![...document.fonts].some(font => font.family === 'ChartelisExport' && font.weight === weight)) {
-      const font = new FontFace('ChartelisExport', await loadFont(url), { weight });
-      document.fonts.add(await font.load());
-    }
-  }));
-  surface.dataset.pdf = 'true';
-  // KaTeX's typewriter/math fonts have no CJK glyphs. Make the browser's CJK
-  // fallback explicit, so the PDF embeds that same font for these text runs.
-  const fallbackWalker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT);
-  const fallbackNodes: Text[] = [];
-  while (fallbackWalker.nextNode()) {
-    const node = fallbackWalker.currentNode as Text;
-    if (node.parentElement?.closest('code, .katex-html') && /[\u2e80-\uffef]/u.test(node.data)) fallbackNodes.push(node);
-  }
-  for (const node of fallbackNodes) {
-    const fragment = document.createDocumentFragment();
-    for (const part of node.data.split(/([\u2e80-\uffef]+)/u)) {
-      if (!part) continue;
-      if (/[\u2e80-\uffef]/u.test(part)) {
-        const span = document.createElement('span'); span.style.fontFamily = 'ChartelisExport'; span.textContent = part; fragment.append(span);
-      } else fragment.append(document.createTextNode(part));
-    }
-    node.replaceWith(fragment);
-  }
-  // List markers must also be real selectable text (CSS ::marker isn't a text node).
-  for (const li of surface.querySelectorAll('li')) {
-    const parent = li.parentElement!;
-    const marker = document.createElement('span'); marker.className = 'pdf-list-marker';
-    marker.textContent = parent.tagName === 'OL' ? `${Number(parent.getAttribute('start') || 1) + Array.from(parent.children).indexOf(li)}. ` : '• ';
-    li.prepend(marker);
-  }
-  await document.fonts.ready;
-  // Wait until KaTeX and the newly selected export fonts have participated in layout.
-  surface.getBoundingClientRect();
   await document.fonts.ready;
   const bounds = surface.getBoundingClientRect();
   const canvas = document.createElement('canvas'), context = canvas.getContext('2d')!;
@@ -95,7 +60,7 @@ export async function textPdf(surface: HTMLElement, title: string): Promise<Blob
     const family = style.fontFamily.split(',')[0].trim().replace(/["']/g, '');
     context.font = `${italic ? 'italic ' : ''}${bold ? '700' : '400'} ${size}px "${family}"`;
     const metrics = context.measureText('Hg');
-    const ascent = metrics.fontBoundingBoxAscent, descent = metrics.fontBoundingBoxDescent;
+    const ascent = metrics.fontBoundingBoxAscent ?? size * .8, descent = metrics.fontBoundingBoxDescent ?? size * .2;
     const color = (style.color.match(/[\d.]+/g) || ['51', '51', '51']).slice(0, 3).map(Number);
     let line: TextLine | undefined;
     let offset = 0;
@@ -105,9 +70,9 @@ export async function textPdf(surface: HTMLElement, title: string): Promise<Blob
       if (!rect.width || !rect.height || /[\r\n\u200b\u2060]/.test(char)) { line = undefined; continue; }
       const top = rect.top - bounds.top, bottom = rect.bottom - bounds.top;
       const rendered = char === '\t' ? '    ' : char;
-      if (line && Math.abs(line.top - top) < 0.5 && Math.abs(line.bottom - bottom) < 0.5) line.text += rendered;
+      if (line && Math.abs(line.top - top) < 0.5 && Math.abs(line.bottom - bottom) < 0.5) { line.text += rendered; line.width = rect.right - bounds.left - line.left; }
       else {
-        line = { text: rendered, left: rect.left - bounds.left, top, bottom,
+        line = { text: rendered, width: rect.width, left: rect.left - bounds.left, top, bottom,
           baseline: top + (rect.height - ascent - descent) / 2 + ascent,
           size, family, bold, italic, color };
         lines.push(line);
@@ -125,7 +90,11 @@ export async function textPdf(surface: HTMLElement, title: string): Promise<Blob
     let font = embedded.get(url);
     // fontkit's CJK subsetting drops composite glyphs in some PDF readers.
     // Keep complete CJK fonts; KaTeX's small static fonts can be safely subset.
-    if (!font) { font = await pdf.embedFont(await loadFont(url), { subset: !!mathUrl }); embedded.set(url, font); }
+    if (!font) {
+      // Search text must use glyphs with Unicode mappings, not contextual alternates.
+      font = await pdf.embedFont(await loadFont(url), { subset: !!mathUrl, features: { liga: false, clig: false, calt: false, ccmp: false, locl: false, rlig: false, rclt: false, frac: false, numr: false, dnom: false } });
+      embedded.set(url, font);
+    }
     return { font, syntheticItalic: line.italic && !mathUrl };
   }
   const protectedBlocks: KeepTogether[] = [...surface.querySelectorAll('tr, pre, .katex-display, img, h1, h2, h3, h4, h5, h6')].map(element => {
@@ -138,31 +107,23 @@ export async function textPdf(surface: HTMLElement, title: string): Promise<Blob
   const pages = paginate(surface.scrollHeight, (pageHeight - margin * 2) / scale, protectedBlocks, lines);
   for (const slice of pages) {
     const page = pdf.addPage([pageWidth, pageHeight]);
-    // Only backgrounds, borders, images and stretched math rules are rasterized.
-    // Text is removed in the clone and drawn exactly once below as PDF text.
+    // Preserve the browser-rendered fonts and styling exactly. A transparent text
+    // layer below provides search/copy without replacing the visible glyphs.
+    const pageBackground = getComputedStyle(surface).backgroundColor;
     const background = await html2canvas(surface, { scale: 2, y: slice.start, height: slice.end - slice.start,
-      backgroundColor: '#ffffff', useCORS: true, logging: false,
-      onclone: cloned => {
-        const article = cloned.querySelector<HTMLElement>('.export-document[data-pdf="true"]')!;
-        const elements = [article, ...article.querySelectorAll<HTMLElement>('*')];
-        for (const element of elements) {
-          const computed = cloned.defaultView!.getComputedStyle(element);
-          element.style.borderColor = computed.borderColor;
-          element.style.textDecorationColor = computed.textDecorationColor;
-          if (element.closest('svg')) { element.style.fill = computed.fill; element.style.stroke = computed.stroke; }
-        }
-        for (const element of elements) {
-          // html2canvas uses color, rather than -webkit-text-fill-color, for text.
-          element.style.color = 'transparent'; element.style.textShadow = 'none';
-        }
-      },
-    });
+      backgroundColor: pageBackground, useCORS: true, logging: false });
+    const pageColor = (pageBackground.match(/[\d.]+/g) || ['255', '255', '255']).slice(0, 3).map(Number);
+    page.drawRectangle({ x: 0, y: 0, width: pageWidth, height: pageHeight, color: rgb(pageColor[0] / 255, pageColor[1] / 255, pageColor[2] / 255) });
     const image = await pdf.embedPng(background.toDataURL('image/png'));
     page.drawImage(image, { x: margin, y: pageHeight - margin - (slice.end - slice.start) * scale, width: bounds.width * scale, height: (slice.end - slice.start) * scale });
     for (const line of lines.filter(line => (line.top + line.bottom) / 2 >= slice.start && (line.top + line.bottom) / 2 < slice.end)) {
-      const { font, syntheticItalic } = await fontFor(line);
-      page.drawText(line.text, { x: margin + line.left * scale, y: pageHeight - margin - (line.baseline - slice.start) * scale,
-        size: line.size * scale, font, color: rgb(line.color[0] / 255, line.color[1] / 255, line.color[2] / 255), ySkew: syntheticItalic ? degrees(12) : undefined });
+      const { font } = await fontFor(line);
+      const textWidth = font.widthOfTextAtSize(line.text, line.size * scale);
+      const stretch = textWidth > 0 ? line.width * scale / textWidth : 1;
+      page.pushOperators(pushGraphicsState(), concatTransformationMatrix(stretch, 0, 0, 1, margin + line.left * scale, 0));
+      page.drawText(line.text, { x: 0, y: pageHeight - margin - (line.baseline - slice.start) * scale,
+        size: line.size * scale, font, opacity: 0, color: rgb(0, 0, 0) });
+      page.pushOperators(popGraphicsState());
     }
     // Give the browser time to paint progress and respond between pages.
     await new Promise(resolve => setTimeout(resolve, 0));

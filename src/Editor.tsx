@@ -9,6 +9,9 @@ import { toggleMark } from '@milkdown/kit/prose/commands';
 import { $prose, callCommand, insert } from '@milkdown/kit/utils';
 import { highlightMark, highlightRemark } from './highlight';
 import { mathPlugins } from './math';
+import { textColorMark, textColorRemark, normalizeColor, colorStringify } from './text-color';
+import { DOMSerializer } from '@milkdown/kit/prose/model';
+import katex from 'katex';
 import { defaultToolbar } from './preferences';
 import FormatToolbar from './FormatToolbar';
 import { richFocus } from './rich-focus';
@@ -21,7 +24,7 @@ import '@milkdown/kit/prose/view/style/prosemirror.css';
 import { findRich, richSearch, richHighlights, searchKey, scrollSearch, type SearchEditor } from './search';
 
 export interface Heading { text: string; level: number; pos: number }
-export interface EditorHandle extends SearchEditor { selectionText(): string; replaceSelection(text: string): void; selectAll(): void; getMarkdown(): string; replaceMarkdown(markdown: string): string; focus(): void; scrollTo(pos: number): void;
+export interface EditorHandle extends SearchEditor { color(value: string): void; previewHTML(markdown: string): string; selectionText(): string; replaceSelection(text: string): void; selectAll(): void; getMarkdown(): string; replaceMarkdown(markdown: string): string; focus(): void; scrollTo(pos: number): void;
   getCursor(): CursorState; setCursor(cursor: CursorState): void; undo(): void; redo(): void; history(): { undo: boolean; redo: boolean }; format(action: FormatAction, value?: FormatValue): void;
 }
 interface Props {
@@ -47,6 +50,22 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
   useEffect(() => { instance.current?.action(ctx => { const view = ctx.get(editorViewCtx); view.dispatch(view.state.tr.setMeta('focus-refresh', true)); }); }, [props.focusMode, props.active, props.readOnly]);
 
   useImperativeHandle(ref, () => ({
+    color: value => instance.current?.action(ctx => {
+      const color = normalizeColor(value); if (!color || callbacks.current.readOnly) return;
+      const view = ctx.get(editorViewCtx); const { from, to, empty } = view.state.selection; if (empty) return;
+      view.dispatch(closeHistory(view.state.tr).addMark(from, to, view.state.schema.marks.textColor.create({ color })));
+      view.dispatch(closeHistory(view.state.tr)); view.focus();
+    }),
+    previewHTML: markdown => instance.current?.action(ctx => {
+      const doc = ctx.get(parserCtx)(markdown); if (!doc) throw new Error('无法解析导出文稿');
+      const container = document.createElement('div'); container.append(DOMSerializer.fromSchema(doc.type.schema).serializeFragment(doc.content));
+      container.querySelectorAll<HTMLElement>('[data-math]').forEach(element => {
+        const block = element.tagName === 'DIV'; element.className = 'math-node ' + (block ? 'math-block' : 'math-inline');
+        const rendered = document.createElement('span'); rendered.className = 'math-render';
+        rendered.innerHTML = katex.renderToString(element.dataset.math || '', { displayMode: block, throwOnError: false, trust: false }); element.replaceChildren(rendered);
+      });
+      return container.innerHTML;
+    }) ?? '',
     find: (query, sensitive) => instance.current?.action(ctx => findRich(ctx.get(editorViewCtx).state.doc, query, sensitive)) ?? [],
     highlight: (matches, index, scroll) => instance.current?.action(ctx => {
       const view = ctx.get(editorViewCtx);
@@ -189,8 +208,8 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
       ctx.set(rootCtx, host);
       ctx.set(defaultValueCtx, props.initialValue.replace(/^\uFEFF/, ''));
       ctx.update(editorViewOptionsCtx, options => ({ ...options, editable: () => !cancelled && !callbacks.current.readOnly }));
-      ctx.update(remarkStringifyOptionsCtx, options => ({ ...options, handlers: { ...options.handlers, highlight: (node: any, _parent: any, state: any, info: any) => '==' + state.containerPhrasing(node, info) + '==' } }));
-    }).use(commonmark).use(gfm).use(history).use(clipboard).use(mathPlugins).use(highlightRemark).use(highlightMark).use(ui).use($prose(() => richSearch)).use(richFocus(() => !!callbacks.current.focusMode && callbacks.current.active));
+      ctx.update(remarkStringifyOptionsCtx, options => ({ ...options, handlers: { ...options.handlers, textColor: colorStringify, highlight: (node: any, _parent: any, state: any, info: any) => '==' + state.containerPhrasing(node, info) + '==' } }));
+    }).use(commonmark).use(gfm).use(history).use(clipboard).use(mathPlugins).use(highlightRemark).use(highlightMark).use(textColorRemark).use(textColorMark).use(ui).use($prose(() => richSearch)).use(richFocus(() => !!callbacks.current.focusMode && callbacks.current.active));
 
     const creation = editor.create().then(() => {
       if (cancelled) return;

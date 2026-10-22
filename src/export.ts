@@ -6,19 +6,22 @@ import remarkGfm from 'remark-gfm';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
 import { remarkHighlight } from './highlight';
+import { remarkTextColor } from './text-color';
+import { createPreviewSurface, type PreviewSnapshot } from './preview-export';
 import { desktop } from './files';
+import { nativeDialogTitle } from './platform';
 import type { DocumentEntry } from './document';
 import { wordMath } from './word-math';
 
 export type ExportFormat = 'pdf' | 'png' | 'docx';
 export async function markdownHtml(markdown: string) {
   // Raw HTML is deliberately not executed in the export surface.
-  return String(await unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkHighlight).use(remarkRehype).use(rehypeKatex, { throwOnError: false, trust: false }).use(rehypeStringify).process(markdown));
+  return String(await unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkHighlight).use(remarkTextColor).use(remarkRehype).use(rehypeKatex, { throwOnError: false, trust: false }).use(rehypeStringify).process(markdown));
 }
 
 export async function wordBlob(markdown: string, title: string) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ExternalHyperlink, HeadingLevel, WidthType, LevelFormat, AlignmentType } = await import('docx');
-  const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkHighlight);
+  const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkHighlight).use(remarkTextColor);
   const tree: any = processor.runSync(processor.parse(markdown));
   const numbering: any[] = [];
   function inline(node: any, style: any = {}): any[] {
@@ -28,7 +31,7 @@ export async function wordBlob(markdown: string, title: string) {
     if (node.type === 'inlineCode') return [new TextRun({ text: node.value, font: 'Consolas', shading: { fill: 'F0EFEB' }, ...style })];
     if (node.type === 'image') return [new ExternalHyperlink({ link: node.url, children: [new TextRun({ text: `[图片：${node.alt || node.url}]`, style: 'Hyperlink' })] })];
     if (node.type === 'link') return [new ExternalHyperlink({ link: node.url, children: node.children.flatMap((child: any) => inline(child, { ...style, style: 'Hyperlink' })) })];
-    const next = { ...style, ...(node.type === 'strong' ? { bold: true } : node.type === 'emphasis' ? { italics: true } : node.type === 'delete' ? { strike: true } : node.type === 'highlight' ? { highlight: 'yellow' } : {}) };
+    const next = { ...style, ...(node.type === 'textColor' ? { color: node.color.slice(1) } : {}), ...(node.type === 'strong' ? { bold: true } : node.type === 'emphasis' ? { italics: true } : node.type === 'delete' ? { strike: true } : node.type === 'highlight' ? { highlight: 'yellow' } : {}) };
     return (node.children || []).flatMap((child: any) => inline(child, next));
   }
   function blocks(nodes: any[], level = 0): any[] {
@@ -57,12 +60,9 @@ export async function wordBlob(markdown: string, title: string) {
   return Packer.toBlob(new Document({ title, creator: 'Chartelis', styles: { default: { document: { run: { font: { ascii: 'Calibri', hAnsi: 'Calibri', eastAsia: 'Microsoft YaHei' }, size: 22, color: '363832' } } } }, numbering: { config: numbering }, sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 } } }, children }] }));
 }
 
-export async function visualBlob(markdown: string, format: 'png' | 'pdf', title = 'Chartelis') {
+export async function visualBlob(markdown: string, format: 'png' | 'pdf', title = 'Chartelis', preview?: PreviewSnapshot) {
   const { default: html2canvas } = await import('html2canvas');
-  const surface = document.createElement('article');
-  surface.className = 'export-document';
-  surface.innerHTML = await markdownHtml(markdown);
-  document.body.appendChild(surface);
+  const surface = createPreviewSurface(preview ?? { html: await markdownHtml(markdown), width: 832, font: 'serif', variables: {} });
   try {
     await document.fonts.ready;
     await Promise.all([...surface.querySelectorAll('img')].map(async img => {
@@ -71,7 +71,7 @@ export async function visualBlob(markdown: string, format: 'png' | 'pdf', title 
     const height = surface.scrollHeight;
     if (format === 'png') {
       if (height > 30000) throw new Error('文稿过长，超过单张图片限制，请改用分页 PDF。');
-      const canvas = await html2canvas(surface, { scale: Math.min(2, 30000 / height), backgroundColor: '#ffffff', useCORS: true, logging: false });
+      const canvas = await html2canvas(surface, { scale: Math.min(2, 30000 / height), backgroundColor: getComputedStyle(surface).backgroundColor, useCORS: true, logging: false });
       return await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片生成失败')), 'image/png'));
     }
     const { textPdf } = await import('./pdf-export');
@@ -79,15 +79,15 @@ export async function visualBlob(markdown: string, format: 'png' | 'pdf', title 
   } finally { surface.remove(); }
 }
 
-export async function exportDocument(doc: DocumentEntry, format: ExportFormat) {
+export async function exportDocument(doc: DocumentEntry, format: ExportFormat, preview?: PreviewSnapshot) {
   const filename = doc.name.replace(/\.(md|markdown|mdown|txt)$/i, '') + '.' + format;
   let path: string | null = null;
   if (desktop) {
     const { save } = await import('@tauri-apps/plugin-dialog');
-    path = await save({ defaultPath: filename, title: '导出文稿', filters: [{ name: format.toUpperCase(), extensions: [format] }] });
+    path = await save({ defaultPath: filename, title: nativeDialogTitle('导出文稿'), filters: [{ name: format.toUpperCase(), extensions: [format] }] });
     if (!path) return false;
   }
-  const blob = format === 'docx' ? await wordBlob(doc.markdown, doc.name) : await visualBlob(doc.markdown, format, doc.name);
+  const blob = format === 'docx' ? await wordBlob(doc.markdown, doc.name) : await visualBlob(doc.markdown, format, doc.name, preview);
   if (path) {
     const { writeFile } = await import('@tauri-apps/plugin-fs');
     await writeFile(path, new Uint8Array(await blob.arrayBuffer()));

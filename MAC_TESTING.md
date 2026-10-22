@@ -2,11 +2,15 @@
 
 ## 安装
 
-1. 在 GitHub 仓库的 Actions → Build Chartelis 中打开成功的构建，下载 `Chartelis-macos-universal` artifact（需登录 GitHub）。解压 ZIP，得到 DMG。
+1. 在 [GitHub Releases](https://github.com/Mclarenlife/Chartelis/releases) 下载最新测试版的 `Chartelis_版本号_universal.dmg`。
 2. 打开 DMG，将 Chartelis 拖入「应用程序」，推出磁盘映像，再从「应用程序」启动。
 3. 测试包支持 macOS 12 及以上，同时包含 Apple Silicon 和 Intel 架构。包使用 ad-hoc 签名，尚未经过 Apple Developer ID 签名和公证。若 macOS 阻止首次打开，可在「系统设置 → 隐私与安全性」中对这份已确认来源的测试包选择「仍要打开」。不需要关闭整个系统的安全检查。
 
 ## 建议验证
+
+- 系统语言设为简体中文、繁体中文或英文，完全退出后重新启动 Chartelis，打开文件、打开文件夹、另存为及导出时，确认系统对话框按钮和路径控件跟随系统语言。应用内编辑界面仍使用中文。
+- 红黄绿窗口按钮与 Chartelis 顶栏位于同一行，没有额外的标题文字栏；拖动顶栏空白及品牌区域可以移动窗口，菜单和设置按钮仍能正常点击。
+- 收起顶栏后保留窗口按钮、拖动区域与展开按钮；验证最小窗口宽度、亮暗色、全屏进入/退出和文稿切换后，窗口按钮不会遮住内容。
 
 - 中文输入法、选区、撤销重做、源码与即时预览切换。
 - 设置中选「跟随系统」，切换 macOS 亮色/暗色，应立即同步；手动亮色/暗色和可选配色应保持选择。

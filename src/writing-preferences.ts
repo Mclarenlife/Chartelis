@@ -2,6 +2,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import { remarkTextColor } from './text-color';
 
 export const writingThemes = [
   { id: 'original', name: '自在', description: '宋体 · 17px · 舒展留白', font: 'serif', size: 17, line: 1.95, ink: 'auto', spacing: '.25px' },
@@ -22,7 +23,7 @@ export function parseCount(value: string | null): CountOptions {
     return { mode: ['characters', 'words', 'han'].includes(v.mode) ? v.mode : 'characters', ...Object.fromEntries(['source', 'spaces', 'punctuation', 'code'].map(key => [key, typeof v[key] === 'boolean' ? v[key] : defaultCount[key as keyof CountOptions]])) } as CountOptions;
   } catch { return { ...defaultCount }; }
 }
-const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkTextColor);
 interface TextNode { type: string; value?: string; alt?: string | null; children?: TextNode[] }
 function renderedText(node: TextNode, includeCode: boolean): string {
   if (['code', 'inlineCode', 'math', 'inlineMath'].includes(node.type)) return includeCode ? node.value ?? '' : '';
@@ -36,7 +37,7 @@ function renderedText(node: TextNode, includeCode: boolean): string {
 export function countText(markdown: string, options: CountOptions) {
   let text = markdown;
   if (!options.source) {
-    text = renderedText(parser.parse(markdown), options.code);
+    text = renderedText(parser.runSync(parser.parse(markdown)) as TextNode, options.code);
   }
   if (options.mode === 'han') return (text.match(/\p{Script=Han}/gu) ?? []).length;
   if (options.mode === 'words') return (text.match(/\p{Script=Han}/gu) ?? []).length + (text.replace(/\p{Script=Han}/gu, ' ').match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) ?? []).length;

@@ -7,7 +7,7 @@ import FormatMenu, { LinkDialog } from './FormatMenu';
 import SearchBar from './SearchBar';
 
 export type EditorMode = 'preview' | 'source';
-export interface SessionHandle { focus(): void; selectionText(): string; replaceSelection(text: string): void; selectAll(): void; format(action: FormatAction): void; search(): void; replaceMarkdown(text: string): void; getMarkdown(): string; setMode(mode: EditorMode): void; scrollTo(pos: number): void; snapshot(): SessionSnapshot; undo(): void; redo(): void; history(): { undo: boolean; redo: boolean } }
+export interface SessionHandle { previewHTML(): string; focus(): void; selectionText(): string; replaceSelection(text: string): void; selectAll(): void; format(action: FormatAction): void; search(): void; replaceMarkdown(text: string): void; getMarkdown(): string; setMode(mode: EditorMode): void; scrollTo(pos: number): void; snapshot(): SessionSnapshot; undo(): void; redo(): void; history(): { undo: boolean; redo: boolean } }
 interface Props {
   initialValue: string; active: boolean; font: string;
   readOnly?: boolean; toolbar?: FormatAction[];
@@ -71,6 +71,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
     else (modeRef.current === 'source' ? source.current : rich.current)?.format(action);
   };
   useImperativeHandle(ref, () => ({
+    previewHTML: () => rich.current?.previewHTML(canonical.current) ?? '',
     focus: () => (modeRef.current === 'source' ? source.current : rich.current)?.focus(),
     selectionText: () => (modeRef.current === 'source' ? source.current : rich.current)?.selectionText() ?? '',
     replaceSelection: text => { if (!callbacks.current.readOnly) (modeRef.current === 'source' ? source.current : rich.current)?.replaceSelection(text); },
@@ -150,7 +151,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
         onReady={() => { source.current?.setCursor(initial.current.source.cursor); setRevision(value => value + 1); publishOutline(); requestAnimationFrame(restore); }}
         onChange={markdown => { change(sourceOrigins.current.get(markdown) ?? markdown); publishOutline(); }} />}
     </div>
-    {menu && props.active && <FormatMenu {...menu} onClose={closeMenu} onSelect={action => { format(action); closeMenu(); }} />}
+    {menu && props.active && <FormatMenu {...menu} onClose={closeMenu} onColor={color => { if (!callbacks.current.readOnly) (modeRef.current === 'source' ? source.current : rich.current)?.color(color); closeMenu(); }} onSelect={action => { format(action); closeMenu(); }} />}
     {linkDialog && props.active && <LinkDialog action={linkDialog} onClose={() => setLinkDialog(null)} onInsert={value => { (modeRef.current === 'source' ? source.current : rich.current)?.format(linkDialog, value); setLinkDialog(null); }} />}
   </section>;
 });

@@ -30,8 +30,9 @@ try {
   await editor.click({ button: 'right' });
   const menu = page.getByRole('menu', { name: 'Markdown 格式', exact: true });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveCount(23);
+  await expect(menu.getByRole('menuitem')).toHaveCount(32);
   assert((await menu.getByRole('menuitem').allTextContents()).every(text => !text.trim()));
+  await menu.getByRole('menuitem', { name: '粗体', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(menu.getByRole('menuitem', { name: '斜体', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown');

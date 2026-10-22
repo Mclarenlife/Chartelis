@@ -1,4 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
+import { macDesktop, nativeDialogTitle } from './platform';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { createDocument, encodeDocument, isDirty, safeFileName, type BrowserFileHandle, type DocumentEntry } from './document';
@@ -20,8 +21,8 @@ export async function folderItems(path: string): Promise<FolderItem[]> {
     .map(item => ({ name: item.name, path: `${path.replace(/[\\/]$/, '')}/${item.name}`, directory: item.isDirectory }))
     .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
 }
-export async function chooseFolder() { return open({ directory: true, multiple: false, title: '打开文稿文件夹', recursive: true }); }
-const filters = [{ name: 'Markdown 文稿', extensions: ['md', 'markdown', 'mdown', 'txt'] }];
+export async function chooseFolder() { return open({ directory: true, multiple: false, title: nativeDialogTitle('打开文稿文件夹'), recursive: true }); }
+const filters = [{ name: macDesktop ? 'Markdown' : 'Markdown 文稿', extensions: ['md', 'markdown', 'mdown', 'txt'] }];
 const pickerTypes = [{ description: 'Markdown 文稿', accept: { 'text/markdown': ['.md', '.markdown', '.mdown', '.txt'] } }];
 type PickerWindow = Window & {
   showOpenFilePicker?: (options: unknown) => Promise<BrowserFileHandle[]>;
@@ -34,7 +35,7 @@ export function isCancelled(error: unknown) {
 
 export async function openDocument(): Promise<DocumentEntry | null> {
   if (desktop) {
-    const path = await open({ multiple: false, directory: false, filters, title: '打开 Markdown 文稿' });
+    const path = await open({ multiple: false, directory: false, filters, title: nativeDialogTitle('打开 Markdown 文稿') });
     if (!path) return null;
     const text = await readTextFile(path);
     return { ...createDocument(path.split(/[\\/]/).pop(), text), path, diskContent: text };
@@ -67,7 +68,7 @@ export async function saveDocument(doc: DocumentEntry, saveAs: boolean): Promise
   const content = !isDirty(doc) && doc.diskContent !== undefined ? doc.diskContent : encodeDocument(doc);
   if (desktop) {
     const path = saveAs || !doc.path
-      ? await save({ defaultPath: doc.path || safeFileName(doc.name), filters, title: '保存文稿' })
+      ? await save({ defaultPath: doc.path || safeFileName(doc.name), filters, title: nativeDialogTitle('保存文稿') })
       : doc.path;
     if (!path) return null;
     if (path === doc.path && doc.diskContent !== undefined && await readTextFile(path) !== doc.diskContent) {

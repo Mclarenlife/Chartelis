@@ -8,6 +8,7 @@ import { createSourceState, sourceReplacement, sourceHeadings } from './source-s
 import type { Heading } from './Editor';
 import type { CursorState } from './workspace';
 import { formatSource, type FormatAction, type FormatValue } from './formatting';
+import { colorSource } from './text-color';
 import { visualLineRange } from './focus-line';
 
 const searchEffect = StateEffect.define<DecorationSet>();
@@ -23,7 +24,7 @@ const focusField = StateField.define<DecorationSet>({
   provide: field => EditorView.decorations.from(field),
 });
 
-export interface SourceHandle extends SearchEditor { selectionText(): string; replaceSelection(text: string): void; selectAll(): void;
+export interface SourceHandle extends SearchEditor { color(value: string): void; selectionText(): string; replaceSelection(text: string): void; selectAll(): void;
   getMarkdown(): string;
   replaceMarkdown(markdown: string): void;
   getHeadings(): Heading[];
@@ -44,6 +45,11 @@ const SourceEditor = forwardRef<SourceHandle, Props>(function SourceEditor(props
   const measure = useRef(() => {});
   useEffect(() => measure.current(), [props.focusMode, props.active]);
   useImperativeHandle(ref, () => ({
+    color: value => {
+      const view = instance.current; if (!view || callbacks.current.readOnly) return;
+      const { from, to } = view.state.selection.main; const change = colorSource(view.state.doc.toString(), from, to, value);
+      if (change) { view.dispatch({ changes: change, selection: { anchor: from, head: from + change.insert.length }, annotations: isolateHistory.of('full') }); view.focus(); }
+    },
     selectionText: () => { const view = instance.current; return view ? view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to) : ''; },
     replaceSelection: text => { const view = instance.current; if (view && !callbacks.current.readOnly) { view.dispatch(view.state.replaceSelection(text), { annotations: isolateHistory.of('full'), scrollIntoView: true }); view.focus(); } },
     selectAll: () => { const view = instance.current; if (view) { view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } }); view.focus(); } },
