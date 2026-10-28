@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { PDFDocument, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, type PDFFont } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import html2canvas from 'html2canvas';
@@ -6,7 +7,7 @@ const mathFonts = import.meta.glob<string>('/node_modules/katex/dist/fonts/*.ttf
 const fontBytes = new Map<string, Promise<ArrayBuffer>>();
 function loadFont(url: string) {
   if (!fontBytes.has(url)) fontBytes.set(url, fetch(url).then(response => {
-    if (!response.ok) throw new Error('PDF 字体加载失败，请重新尝试导出。');
+    if (!response.ok) throw new Error(t('PDF 字体加载失败，请重新尝试导出。'));
     return response.arrayBuffer();
   }).catch(error => { fontBytes.delete(url); throw error; }));
   return fontBytes.get(url)!;

@@ -1,6 +1,6 @@
 [package]
 name = "chartelis"
-version = "0.1.5"
+version = "0.1.6"
 description = "A quiet space for words. A minimal Markdown editor."
 authors = ["Chartelis"]
 edition = "2021"
@@ -20,6 +20,8 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-fs = "~2.6.0"
 tauri-plugin-persisted-scope = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-http = "2"
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

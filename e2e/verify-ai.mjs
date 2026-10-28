@@ -1,0 +1,116 @@
+import { chromium, expect } from '@playwright/test';
+import http from 'node:http';
+const calls = [];
+const answer = '# 写作建议\n\n保留你的语气，让表达更**清晰**。\n\n## 三个步骤\n\n1. 提炼中心句\n2. 补充具体例子\n3. 删除重复表达\n\n| 内容 | 建议 |\n| --- | --- |\n| 开头 | 简洁直接 |\n| 结尾 | 留下余韵 |\n\n```js\nconst idea = "从一个想法开始";\n```\n\n公式示例：$E=mc^2$\n\n<script>window.aiUnsafe=true</script>\n\n![tracking](http://127.0.0.1:1431/tracker)';
+const server = http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'authorization,content-type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  if (req.method === 'OPTIONS') { res.writeHead(204).end(); return; }
+  if (req.url === '/tracker') { calls.push({ tracker: true }); res.end(); return; }
+  let body=''; for await (const chunk of req) body+=chunk;
+  const data=JSON.parse(body); calls.push({ ...data, auth:req.headers.authorization, url:req.url });
+  if (data.model === 'bad-model') { res.writeHead(401).end('dummy-secret-must-not-appear'); return; }
+  res.writeHead(200, {'Content-Type':'text/event-stream'});
+  const part = content => res.write(`data: ${JSON.stringify({ choices:[{delta:{content}}] })}\r\n\r\n`);
+  if (data.messages.at(-1).content === 'slow') {
+    part('正在生成的部分内容');
+    const timer=setTimeout(()=> { part('后续内容'); res.end('data: [DONE]\n\n'); },10000);
+    res.on('close',()=>clearTimeout(timer)); return;
+  }
+  part(answer.slice(0,90));
+  setTimeout(()=> { part(answer.slice(90)); res.end('data: [DONE]\n\n'); },100);
+});
+await new Promise(resolve=>server.listen(1431,'127.0.0.1',resolve));
+const browser = await chromium.launch({channel:'msedge',headless:true});
+try {
+  const page = await browser.newPage({locale:'zh-CN',viewport:{width:1320,height:960}});
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('http://127.0.0.1:1420');
+  await page.keyboard.press('Control+n');
+  await page.getByRole('textbox',{name:'Markdown 编辑器',exact:true}).fill('文稿原文保持不变');
+  await page.getByRole('button',{name:'AI 助手',exact:true}).click();
+  const panel=page.getByRole('complementary',{name:'AI 助手'});
+  await expect(panel).toBeVisible();
+  async function add(name,model) {
+    await panel.getByRole('button',{name:'添加 API',exact:true}).click();
+    await panel.getByLabel('配置名称',{exact:true}).fill(name);
+    await panel.getByLabel('API 地址',{exact:true}).fill('http://127.0.0.1:1431/v1');
+    await panel.getByLabel('模型 ID',{exact:true}).fill(model);
+    await panel.getByLabel('API Key',{exact:true}).fill('test-key-for-'+model);
+    await panel.getByRole('button',{name:'保存配置',exact:true}).click();
+    await expect(panel.getByRole('heading',{name:'我的 API'})).toBeVisible();
+  }
+  await add('写作助手','writer-model');
+  await add('备用接口','bad-model');
+  expect(await page.evaluate(()=>JSON.stringify(localStorage))).not.toContain('test-key-for-');
+  await panel.getByRole('button',{name:'开始对话'}).click();
+  const composer=panel.getByRole('textbox',{name:'发送给 AI 的消息'});
+  await composer.fill('请给我一些写作建议'); await composer.press('Enter');
+  await expect(panel.locator('.ai-markdown h1')).toHaveText('写作建议');
+  await expect(panel.getByRole('button',{name:'复制回复'})).toBeVisible();
+  await expect(panel.locator('table')).toHaveCount(1);
+  await expect(panel.locator('pre code')).toContainText('const idea');
+  await expect(panel.locator('.katex')).toHaveCount(1);
+  expect(await page.evaluate(()=>window.aiUnsafe)).toBeUndefined();
+  expect(calls.some(c=>c.tracker)).toBe(false);
+  expect(calls[0].messages).toEqual([{role:'user',content:'请给我一些写作建议'}]);
+  expect(calls[0].auth).toBe('Bearer test-key-for-writer-model');
+  await expect(page.getByRole('textbox',{name:'Markdown 编辑器',exact:true})).toHaveText('文稿原文保持不变');
+  await page.screenshot({path:'artifacts/ai-assistant-light.png'});
+  await composer.fill('继续'); await composer.press('Enter');
+  await expect(panel.getByRole('button',{name:'复制回复'})).toHaveCount(2);
+  expect(calls[1].messages.map(m=>m.role)).toEqual(['user','assistant','user']);
+  const selector=panel.getByRole('combobox',{name:'当前 API'});
+  await selector.selectOption({label:'备用接口 · bad-model'});
+  await expect(panel.locator('.ai-message')).toHaveCount(0);
+  await composer.fill('第二个接口'); await composer.press('Enter');
+  await expect(panel.getByRole('alert')).toContainText('HTTP 401');
+  expect(await panel.innerText()).not.toContain('dummy-secret-must-not-appear');
+  expect(calls[2].messages).toEqual([{role:'user',content:'第二个接口'}]);
+  await selector.selectOption({label:'写作助手 · writer-model'});
+  await composer.fill('slow'); await composer.press('Enter');
+  await expect(panel.getByText('正在生成的部分内容',{exact:true})).toBeVisible();
+  await expect(selector).toBeDisabled();
+  await panel.getByRole('button',{name:'停止生成'}).click();
+  await expect(selector).toBeEnabled();
+  await expect(panel.getByText('已停止',{exact:true})).toBeVisible();
+  await panel.getByRole('button',{name:'关闭 AI 助手'}).click();
+  await page.getByRole('button',{name:'AI 助手',exact:true}).click();
+  await expect(panel.getByText('已停止',{exact:true})).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'AI 助手',exact:true}).click();
+  await expect(selector).toHaveValue(await page.evaluate(()=>JSON.parse(localStorage.getItem('chartelis.ai.settings.v1')).activeId));
+  await expect(selector.locator('option')).toHaveCount(2);
+  await composer.fill('重启后'); await composer.press('Enter');
+  await expect(panel.getByRole('button',{name:'复制回复'})).toBeVisible();
+  expect(calls.at(-1).auth).toBe('Bearer test-key-for-writer-model');
+  const rich=page.getByRole('textbox',{name:'Markdown 编辑器',exact:true});
+  await rich.click(); await page.keyboard.press('Control+a');
+  await panel.getByRole('button',{name:'引用选区',exact:true}).click();
+  await expect(panel.locator('.ai-quote')).toContainText('文稿原文保持不变');
+  await composer.fill('分析引用'); await composer.press('Enter');
+  await expect(panel.getByRole('button',{name:'复制回复'})).toHaveCount(2);
+  expect(calls.at(-1).messages.at(-1).content).toContain('文稿原文保持不变');
+  await expect(rich).toHaveText('文稿原文保持不变');
+  await panel.getByRole('button',{name:'管理 API'}).click();
+  await panel.getByRole('button',{name:/写作助手 writer-model/}).click();
+  await panel.getByLabel('配置名称',{exact:true}).fill('我的写作助手');
+  await panel.getByRole('button',{name:'保存配置',exact:true}).click();
+  await expect(selector.locator('option').first()).toHaveText('我的写作助手 · writer-model');
+  await panel.getByRole('button',{name:'删除 API 备用接口'}).click();
+  await panel.getByRole('button',{name:'确认删除'}).click();
+  await expect(selector.locator('option')).toHaveCount(1);
+  expect(await page.evaluate(()=>JSON.stringify(sessionStorage))).not.toContain('test-key-for-bad-model');
+  await panel.getByRole('button',{name:'开始对话'}).click();
+  await composer.fill('保存配置后'); await composer.press('Enter');
+  await expect(panel.getByRole('button',{name:'复制回复'})).toHaveCount(3);
+  expect(calls.at(-1).auth).toBe('Bearer test-key-for-writer-model');
+  await page.getByRole('button',{name:'切换深色主题'}).click();
+  await page.screenshot({path:'artifacts/ai-assistant-dark.png'});
+  await page.setViewportSize({width:720,height:900});
+  await expect(panel).toBeVisible();
+  const right=await panel.evaluate(el=>el.getBoundingClientRect().right); expect(right).toBeLessThanOrEqual(720);
+  expect(errors).toEqual([]);
+  console.log('PASS: multiple API profiles, key separation, selected endpoint/model/auth, isolated conversations, streaming Markdown/table/code/math, safe output, cancellation, errors, restart, deletion and compact layout.');
+} finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); }

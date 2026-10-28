@@ -1,3 +1,4 @@
+import { t, useLanguage } from './i18n';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { findText, type SearchEditor } from './search';
 import { StateEffect, StateField, EditorState, Compartment } from '@codemirror/state';
@@ -41,6 +42,9 @@ const SourceEditor = forwardRef<SourceHandle, Props>(function SourceEditor(props
   callbacks.current = props;
   const syncing = useRef(false);
   const editable = useRef(new Compartment());
+  const localizedAttributes = useRef(new Compartment());
+  const { resolved: language } = useLanguage();
+  useEffect(() => { instance.current?.dispatch({ effects: localizedAttributes.current.reconfigure(EditorView.contentAttributes.of({ 'aria-label': t('Markdown 源码编辑器'), spellcheck: 'false' })) }); }, [language]);
   useEffect(() => { instance.current?.dispatch({ effects: editable.current.reconfigure(EditorState.readOnly.of(!!props.readOnly)) }); }, [props.readOnly]);
   const measure = useRef(() => {});
   useEffect(() => measure.current(), [props.focusMode, props.active]);
@@ -100,7 +104,7 @@ const SourceEditor = forwardRef<SourceHandle, Props>(function SourceEditor(props
       lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(), focusField,
       bracketMatching(), syntaxHighlighting(defaultHighlightStyle), EditorView.lineWrapping,
       keymap.of([{ key: 'Mod-Shift-z', run: redo }, ...historyKeymap, ...defaultKeymap]),
-      EditorView.contentAttributes.of({ 'aria-label': 'Markdown 源码编辑器', spellcheck: 'false' }),
+      localizedAttributes.current.of(EditorView.contentAttributes.of({ 'aria-label': t('Markdown 源码编辑器'), spellcheck: 'false' })),
       EditorView.updateListener.of(update => {
         if (update.docChanged && !syncing.current) callbacks.current.onChange(update.state.doc.toString());
         if (update.docChanged || update.selectionSet || update.viewportChanged || update.geometryChanged) { callbacks.current.onState?.(); measure.current(); }

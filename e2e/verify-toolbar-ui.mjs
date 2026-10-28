@@ -2,7 +2,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 960 } });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 960 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:1420/');

@@ -1,3 +1,4 @@
+import { t, tf, useLanguage } from './i18n';
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, serializerCtx, parserCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core';
 import { commonmark, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand, turnIntoTextCommand, createCodeBlockCommand, insertHrCommand } from '@milkdown/kit/preset/commonmark';
@@ -9,6 +10,8 @@ import { toggleMark } from '@milkdown/kit/prose/commands';
 import { $prose, callCommand, insert } from '@milkdown/kit/utils';
 import { highlightMark, highlightRemark } from './highlight';
 import { mathPlugins } from './math';
+import { latexCompatibility } from './latex-preference';
+import { wrapLatex } from './latex-delimiters';
 import { textColorMark, textColorRemark, normalizeColor, colorStringify } from './text-color';
 import { DOMSerializer } from '@milkdown/kit/prose/model';
 import katex from 'katex';
@@ -46,6 +49,13 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
   const callbacks = useRef(props);
   callbacks.current = props;
   const [ready, setReady] = useState(false);
+  const { resolved: language } = useLanguage();
+  useEffect(() => { instance.current?.action(ctx => {
+    const view = ctx.get(editorViewCtx);
+    view.dispatch(view.state.tr.setMeta('language-refresh', true));
+    view.dom.querySelectorAll<HTMLElement>('.math-node').forEach(node => { node.title = t('点击编辑 LaTeX 公式'); });
+    view.dom.querySelectorAll<HTMLTextAreaElement>('.math-input').forEach(input => { input.setAttribute('aria-label', t('LaTeX 公式源码')); });
+  }); }, [language, ready]);
   const [bubble, setBubble] = useState<SelectionBubble | null>(null);
   useEffect(() => { instance.current?.action(ctx => { const view = ctx.get(editorViewCtx); view.dispatch(view.state.tr.setMeta('focus-refresh', true)); }); }, [props.focusMode, props.active, props.readOnly]);
 
@@ -57,12 +67,16 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
       view.dispatch(closeHistory(view.state.tr)); view.focus();
     }),
     previewHTML: markdown => instance.current?.action(ctx => {
-      const doc = ctx.get(parserCtx)(markdown); if (!doc) throw new Error('无法解析导出文稿');
+      const doc = ctx.get(parserCtx)(markdown); if (!doc) throw new Error(t('无法解析导出文稿'));
       const container = document.createElement('div'); container.append(DOMSerializer.fromSchema(doc.type.schema).serializeFragment(doc.content));
       container.querySelectorAll<HTMLElement>('[data-math]').forEach(element => {
         const block = element.tagName === 'DIV'; element.className = 'math-node ' + (block ? 'math-block' : 'math-inline');
         const rendered = document.createElement('span'); rendered.className = 'math-render';
-        rendered.innerHTML = katex.renderToString(element.dataset.math || '', { displayMode: block, throwOnError: false, trust: false }); element.replaceChildren(rendered);
+        const delimiter = element.dataset.latexDelimiter;
+        if ((delimiter === 'paren' || delimiter === 'bracket') && !latexCompatibility()) {
+          element.classList.add('math-literal'); rendered.textContent = wrapLatex(element.dataset.math || '', delimiter);
+        } else rendered.innerHTML = katex.renderToString(element.dataset.math || '', { displayMode: block || delimiter === 'bracket', throwOnError: false, trust: false });
+        element.replaceChildren(rendered);
       });
       return container.innerHTML;
     }) ?? '',
@@ -109,7 +123,7 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
     replaceMarkdown: markdown => instance.current?.action(ctx => {
       const view = ctx.get(editorViewCtx);
       const next = ctx.get(parserCtx)(markdown.replace(/^\uFEFF/, ''));
-      if (!next) throw new Error('无法解析 Markdown');
+      if (!next) throw new Error(t('无法解析 Markdown'));
       const from = view.state.doc.content.findDiffStart(next.content);
       if (from !== null) {
         const end = view.state.doc.content.findDiffEnd(next.content)!;
@@ -161,10 +175,10 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
     };
     const ui = $prose(() => new Plugin({
       props: {
-        attributes: { 'aria-label': 'Markdown 编辑器', role: 'textbox', 'aria-multiline': 'true', spellcheck: 'false' },
+        attributes: () => ({ 'aria-label': t('Markdown 编辑器'), role: 'textbox', 'aria-multiline': 'true', spellcheck: 'false' }),
         decorations(state) {
           if (state.doc.childCount === 1 && state.doc.firstChild?.type.name === 'paragraph' && !state.doc.firstChild.content.size) {
-            return DecorationSet.create(state.doc, [Decoration.node(0, state.doc.firstChild.nodeSize, { class: 'empty-editor', 'data-placeholder': '写下第一句话，让想法慢慢生长…' })]);
+            return DecorationSet.create(state.doc, [Decoration.node(0, state.doc.firstChild.nodeSize, { class: 'empty-editor', 'data-placeholder': t('写下第一句话，让想法慢慢生长…') })]);
           }
           return DecorationSet.empty;
         },
@@ -217,7 +231,7 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
       callbacks.current.onReady(editor.action(ctx => ctx.get(serializerCtx)(ctx.get(editorViewCtx).state.doc)));
       setReady(true);
     }).catch(error => {
-      if (!cancelled) callbacks.current.onError(`编辑器加载失败：${String(error)}`);
+      if (!cancelled) callbacks.current.onError(tf`编辑器加载失败：${String(error)}`);
     });
     return () => {
       cancelled = true;
@@ -232,7 +246,7 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
 
   return <>
     <div className={`editor-mount ${ready ? 'is-ready' : ''}`} ref={mount} />
-    {!ready && <div className="editor-loading">正在铺开稿纸…</div>}
+    {!ready && <div className="editor-loading">{t("正在铺开稿纸…")}</div>}
     <AnimatePresence>
       {bubble && props.active && !props.readOnly && actions.length > 0 && <motion.div className="floating-toolbar" style={{ left: bubble.x, top: bubble.y, x: '-50%' }} initial={{ opacity: 0, y: 5, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 3, scale: .98 }} transition={{ duration: .16 }}>
         <FormatToolbar actions={actions} marks={bubble.marks} onSelect={action => props.onFormat?.(action)} />

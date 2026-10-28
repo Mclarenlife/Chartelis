@@ -1,3 +1,4 @@
+import { t, tf } from './i18n';
 import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import MarkdownEditor, { type EditorHandle, type Heading } from './Editor';
 import SourceEditor, { type SourceHandle } from './SourceEditor';
@@ -104,7 +105,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
         setMode(next);
         callbacks.current.onMode(next);
         callbacks.current.onState?.();
-      } catch (error) { callbacks.current.onError(`切换模式失败：${String(error)}`); }
+      } catch (error) { callbacks.current.onError(tf`切换模式失败：${String(error)}`); }
     },
     scrollTo: pos => (modeRef.current === 'source' ? source.current : rich.current)?.scrollTo(pos),
   }), [ready]);
@@ -118,7 +119,7 @@ const DocumentSession = forwardRef<SessionHandle, Props>(function DocumentSessio
     return () => cancelAnimationFrame(frame);
   }, [props.active, mode, ready, restore, publishOutline]);
 
-  return <section className={`document-session ${props.focusMode ? 'line-focus' : ''}`} hidden={!props.active} aria-label="文稿编辑区域" onContextMenu={event => {
+  return <section className={`document-session ${props.focusMode ? 'line-focus' : ''}`} hidden={!props.active} aria-label={t("文稿编辑区域")} onContextMenu={event => {
     if (props.readOnly) return;
     if (!(event.target as HTMLElement).closest('[contenteditable]')) return;
     event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY });

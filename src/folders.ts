@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { desktop, chooseFolder, folderItems, openPath } from './files';
 import { createDocument, type BrowserFileHandle } from './document';
 
@@ -14,7 +15,7 @@ export async function chooseWorkspaceFolder(): Promise<FolderLocation | null> {
     return path ? { name: path.split(/[\\/]/).filter(Boolean).pop() || path, path } : null;
   }
   const picker = window as Window & { showDirectoryPicker?: () => Promise<DirectoryHandle> };
-  if (!picker.showDirectoryPicker) throw new Error('当前浏览器不支持文件夹访问，请使用桌面版或支持此功能的浏览器');
+  if (!picker.showDirectoryPicker) throw new Error(t('当前浏览器不支持文件夹访问，请使用桌面版或支持此功能的浏览器'));
   const handle = await picker.showDirectoryPicker();
   return { name: handle.name, handle };
 }

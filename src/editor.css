@@ -35,3 +35,4 @@
 .ProseMirror li[data-checked='true'] > p { color: var(--muted); text-decoration: line-through; }
 .ProseMirror .empty-editor::before { content: attr(data-placeholder); color: var(--subtle); float: left; height: 0; pointer-events: none; font-size: .94em; }
 .ProseMirror .ProseMirror-selectednode { outline: 2px solid var(--gold); }
+.math-literal .math-render { white-space:pre-wrap; font-family:inherit; }

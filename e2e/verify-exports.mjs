@@ -48,7 +48,7 @@ await mkdir('artifacts', { recursive: true });
 await writeFile('artifacts/export-qa.md', sample);
 const browser = await chromium.launch({ channel: process.env.EXPORT_BROWSER || 'msedge', headless: true });
 try {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ locale: 'zh-CN' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(`${process.env.EXPORT_TEST_URL || 'http://127.0.0.1:1420'}/e2e/export-harness.html`);
   await page.waitForFunction(() => typeof window.exportSample === 'function');

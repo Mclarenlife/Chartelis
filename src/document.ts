@@ -1,3 +1,4 @@
+import { t } from './i18n';
 export interface DocumentEntry {
   id: string;
   name: string;
@@ -40,7 +41,7 @@ export const welcome = `# 让想法，自然发生。
 不必急着写得完美。先写下来，就很好。
 `;
 
-export function createDocument(name = '未命名.md', markdown = ''): DocumentEntry {
+export function createDocument(name = t('未命名.md'), markdown = ''): DocumentEntry {
   return {
     id: crypto.randomUUID(), name, markdown,
     savedMarkdown: markdown,
@@ -68,7 +69,7 @@ export function countCharacters(markdown: string) {
 }
 
 export function safeFileName(name: string) {
-  const base = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '').trim().replace(/[. ]+$/, '') || '未命名';
+  const base = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '').trim().replace(/[. ]+$/, '') || t('未命名');
   return /\.(md|markdown|mdown|txt)$/i.test(base) ? base : `${base}.md`;
 }
 

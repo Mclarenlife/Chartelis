@@ -1,7 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
@@ -13,7 +13,8 @@ try {
   await page.goto('http://127.0.0.1:1420/');
   const menu = async (group, item, checked = false) => { await page.getByRole('button', { name: group, exact: true }).click(); await page.getByRole(checked ? 'menuitemcheckbox' : 'menuitem', { name: item, exact: true }).click(); };
   await expect(page.locator('.sidebar')).toHaveCount(0);
-  await expect(page.locator('.topbar .brand')).toContainText('Chartelis');
+  await expect(page.locator('.topbar .brand')).toHaveCount(0);
+  await expect(page.locator('.topbar .header-settings')).toBeVisible();
   for (const name of ['设置', '文件', '编辑', '视图', '帮助']) await expect(page.locator('.topbar').getByRole('button', { name, exact: true })).toBeVisible();
   for (const width of [1280, 720, 640]) {
     await page.setViewportSize({ width, height: 900 });

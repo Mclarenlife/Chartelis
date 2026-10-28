@@ -1,3 +1,4 @@
+import { t, tf } from './i18n';
 import katex from 'katex';
 import { DOMParser, type Element } from '@xmldom/xmldom';
 import { ImportedXmlComponent, Math as OfficeMath, type MathComponent } from 'docx';
@@ -18,10 +19,10 @@ export function latexToOmml(source: string, display = false): string {
   try {
     html = katex.renderToString(source, { output: 'mathml', displayMode: display, throwOnError: true, trust: false, strict: 'ignore', maxExpand: 1000 });
   } catch {
-    throw new Error(`公式无法导出，请检查 LaTeX：${source.slice(0, 100)}`);
+    throw new Error(tf`公式无法导出，请检查 LaTeX：${source.slice(0, 100)}`);
   }
   const math = new DOMParser().parseFromString(html, 'text/xml').getElementsByTagName('math')[0];
-  if (!math) throw new Error('公式转换未生成 MathML。');
+  if (!math) throw new Error(t('公式转换未生成 MathML。'));
   function sequence(items: Element[], style: string): string {
     const output: string[] = [];
     for (let i = 0; i < items.length; i++) {
@@ -88,10 +89,10 @@ export function latexToOmml(source: string, display = false): string {
         const notation = node.getAttribute('notation') || '';
         if (notation === 'box') return tag('borderBox', tag('e', all()));
         if (notation.includes('strike')) return tag('borderBox', tag('borderBoxPr', ['Top', 'Bot', 'Left', 'Right'].map(side => prop(`hide${side}`, '1')).join('') + prop('strikeH', '1')) + tag('e', all()));
-        throw new Error(`Word 暂不支持此公式装饰：${notation}。`);
+        throw new Error(tf`Word 暂不支持此公式装饰：${notation}。`);
       }
       case 'mphantom': return tag('phant', tag('phantPr', prop('show', '0') + prop('transp', '1') + prop('zeroAsc', '0') + prop('zeroDesc', '0') + prop('zeroWid', '0')) + tag('e', all()));
-      default: throw new Error(`Word 暂不支持公式节点 ${name}，请简化该公式后重试。`);
+      default: throw new Error(tf`Word 暂不支持公式节点 ${name}，请简化该公式后重试。`);
     }
   }
   return `<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${convert(math)}</m:oMath>`;

@@ -1,8 +1,9 @@
+import { t } from './i18n';
 export type FormatAction = 'mathInline' | 'mathBlock' | 'bold' | 'italic' | 'highlight' | 'strike' | 'inlineCode' | 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'bullet' | 'ordered' | 'task' | 'quote' | 'code' | 'table' | 'link' | 'image' | 'rule';
 export interface FormatValue { url: string; text: string }
 export function linkMarkdown(action: 'link' | 'image', value: FormatValue) {
   const url = value.url.trim();
-  if (!/^https?:\/\//i.test(url) && !(action === 'link' && /^mailto:/i.test(url))) throw new Error('请输入 http、https 或邮件链接');
+  if (!/^https?:\/\//i.test(url) && !(action === 'link' && /^mailto:/i.test(url))) throw new Error(t('请输入 http、https 或邮件链接'));
   return `${action === 'image' ? '!' : ''}[${value.text.replace(/[\\\[\]]/g, '\\$&')}](<${url.replace(/[<>\s]/g, char => encodeURIComponent(char))}>)`;
 }
 export const formatGroups: { label: string; items: [FormatAction, string][] }[] = [
@@ -14,19 +15,19 @@ export const formatGroups: { label: string; items: [FormatAction, string][] }[] 
 export function formatSource(text: string, from: number, to: number, action: FormatAction, value?: FormatValue) {
   const selected = text.slice(from, to);
   if (value && (action === 'link' || action === 'image')) { const insert = linkMarkdown(action, value); return { from, to, insert, anchor: from + insert.length, head: from + insert.length }; }
-  const wrap = (left: string, right = left, fallback = '文字') => ({ from, to, insert: left + (selected || fallback) + right, anchor: from + left.length, head: from + left.length + (selected || fallback).length });
+  const wrap = (left: string, right = left, fallback = t('文字')) => ({ from, to, insert: left + (selected || fallback) + right, anchor: from + left.length, head: from + left.length + (selected || fallback).length });
   if (action === 'mathInline') return wrap('$', '$', 'E = mc^2');
   if (action === 'mathBlock') return wrap('\n\n$$\n', '\n$$\n\n', '\\frac{a}{b}');
   if (action === 'bold') return wrap('**');
   if (action === 'italic') return wrap('*');
   if (action === 'highlight') return wrap('==');
   if (action === 'strike') return wrap('~~');
-  if (action === 'inlineCode') return wrap('`', '`', '代码');
-  if (action === 'link') return wrap('[', '](https://example.com)', '链接文字');
-  if (action === 'image') return wrap('![', '](https://example.com/image.png)', '图片描述');
-  if (action === 'code') return wrap('\n```text\n', '\n```\n', '代码');
+  if (action === 'inlineCode') return wrap('`', '`', t('代码'));
+  if (action === 'link') return wrap('[', '](https://example.com)', t('链接文字'));
+  if (action === 'image') return wrap('![', '](https://example.com/image.png)', t('图片描述'));
+  if (action === 'code') return wrap('\n```text\n', '\n```\n', t('代码'));
   if (action === 'table' || action === 'rule') {
-    const insert = action === 'table' ? '\n\n| 标题一 | 标题二 |\n| --- | --- |\n| 内容 | 内容 |\n\n' : '\n\n---\n\n';
+    const insert = action === 'table' ? t('\n\n| 标题一 | 标题二 |\n| --- | --- |\n| 内容 | 内容 |\n\n') : '\n\n---\n\n';
     return { from, to, insert, anchor: from + insert.length, head: from + insert.length };
   }
   const start = text.lastIndexOf('\n', from - 1) + 1;

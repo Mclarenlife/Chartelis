@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { isTauri } from '@tauri-apps/api/core';
 import { macDesktop, nativeDialogTitle } from './platform';
 import { open, save } from '@tauri-apps/plugin-dialog';
@@ -12,7 +13,7 @@ export async function openPath(path: string): Promise<DocumentEntry> {
 export async function readDocument(doc: DocumentEntry) {
   if (desktop && doc.path) return readTextFile(doc.path);
   if (doc.handle) return (await doc.handle.getFile()).text();
-  throw new Error('请先打开或保存到本地文件');
+  throw new Error(t('请先打开或保存到本地文件'));
 }
 export interface FolderItem { name: string; path: string; directory: boolean }
 export async function folderItems(path: string): Promise<FolderItem[]> {
@@ -21,9 +22,9 @@ export async function folderItems(path: string): Promise<FolderItem[]> {
     .map(item => ({ name: item.name, path: `${path.replace(/[\\/]$/, '')}/${item.name}`, directory: item.isDirectory }))
     .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
 }
-export async function chooseFolder() { return open({ directory: true, multiple: false, title: nativeDialogTitle('打开文稿文件夹'), recursive: true }); }
-const filters = [{ name: macDesktop ? 'Markdown' : 'Markdown 文稿', extensions: ['md', 'markdown', 'mdown', 'txt'] }];
-const pickerTypes = [{ description: 'Markdown 文稿', accept: { 'text/markdown': ['.md', '.markdown', '.mdown', '.txt'] } }];
+export async function chooseFolder() { return open({ directory: true, multiple: false, title: nativeDialogTitle(t('打开文稿文件夹')), recursive: true }); }
+const filters = () => [{ name: macDesktop ? 'Markdown' : t('Markdown 文稿'), extensions: ['md', 'markdown', 'mdown', 'txt'] }];
+const pickerTypes = () => [{ description: t('Markdown 文稿'), accept: { 'text/markdown': ['.md', '.markdown', '.mdown', '.txt'] } }];
 type PickerWindow = Window & {
   showOpenFilePicker?: (options: unknown) => Promise<BrowserFileHandle[]>;
   showSaveFilePicker?: (options: unknown) => Promise<BrowserFileHandle>;
@@ -35,14 +36,14 @@ export function isCancelled(error: unknown) {
 
 export async function openDocument(): Promise<DocumentEntry | null> {
   if (desktop) {
-    const path = await open({ multiple: false, directory: false, filters, title: nativeDialogTitle('打开 Markdown 文稿') });
+    const path = await open({ multiple: false, directory: false, filters: filters(), title: nativeDialogTitle(t('打开 Markdown 文稿')) });
     if (!path) return null;
     const text = await readTextFile(path);
     return { ...createDocument(path.split(/[\\/]/).pop(), text), path, diskContent: text };
   }
   const picker = window as PickerWindow;
   if (picker.showOpenFilePicker) {
-    const [handle] = await picker.showOpenFilePicker({ multiple: false, types: pickerTypes });
+    const [handle] = await picker.showOpenFilePicker({ multiple: false, types: pickerTypes() });
     const text = await (await handle.getFile()).text();
     return { ...createDocument(handle.name, text), handle, diskContent: text };
   }
@@ -60,7 +61,7 @@ export async function openDocument(): Promise<DocumentEntry | null> {
 }
 
 export class ExternalChangeError extends Error {
-  constructor() { super('此文件已被其他应用修改。为保留两个版本，请使用“另存为”。'); }
+  constructor() { super(t('此文件已被其他应用修改。为保留两个版本，请使用“另存为”。')); }
 }
 
 export async function saveDocument(doc: DocumentEntry, saveAs: boolean): Promise<(Partial<DocumentEntry> & { exported?: boolean }) | null> {
@@ -68,7 +69,7 @@ export async function saveDocument(doc: DocumentEntry, saveAs: boolean): Promise
   const content = !isDirty(doc) && doc.diskContent !== undefined ? doc.diskContent : encodeDocument(doc);
   if (desktop) {
     const path = saveAs || !doc.path
-      ? await save({ defaultPath: doc.path || safeFileName(doc.name), filters, title: nativeDialogTitle('保存文稿') })
+      ? await save({ defaultPath: doc.path || safeFileName(doc.name), filters: filters(), title: nativeDialogTitle(t('保存文稿')) })
       : doc.path;
     if (!path) return null;
     if (path === doc.path && doc.diskContent !== undefined && await readTextFile(path) !== doc.diskContent) {
@@ -79,7 +80,7 @@ export async function saveDocument(doc: DocumentEntry, saveAs: boolean): Promise
   }
   const picker = window as PickerWindow;
   if (picker.showSaveFilePicker) {
-    const handle = !saveAs && doc.handle ? doc.handle : await picker.showSaveFilePicker({ suggestedName: safeFileName(doc.name), types: pickerTypes });
+    const handle = !saveAs && doc.handle ? doc.handle : await picker.showSaveFilePicker({ suggestedName: safeFileName(doc.name), types: pickerTypes() });
     if (handle === doc.handle && doc.diskContent !== undefined && await (await handle.getFile()).text() !== doc.diskContent) {
       throw new ExternalChangeError();
     }

@@ -1,4 +1,6 @@
 mod association;
+mod language;
+mod ai_credentials;
 
 use std::{path::{Path, PathBuf}, sync::Mutex};
 use tauri::{Emitter, Manager};
@@ -51,8 +53,9 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![take_pending_files, association::is_default_markdown_app, association::configure_markdown_default])
+        .invoke_handler(tauri::generate_handler![take_pending_files, association::is_default_markdown_app, association::configure_markdown_default, language::installation_language, ai_credentials::ai_get_key, ai_credentials::ai_set_key, ai_credentials::ai_delete_key])
         .setup(|app| {
             queue_files(app.handle(), std::env::args_os().skip(1).map(PathBuf::from));
             Ok(())

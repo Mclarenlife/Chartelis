@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 import FormatToolbar, { FormatIcon, formatLabel } from './FormatToolbar';
@@ -15,19 +16,19 @@ export default function ToolbarSettings({ toolbar, setToolbar }: { toolbar: Form
     setSelected(current); setToolbar(next);
   };
   return <section className="toolbar-settings">
-    <h3>选区浮动工具栏 <button onClick={() => { setToolbar(defaultToolbar); setSelected(defaultToolbar[0]); }}>恢复默认</button></h3>
-    <p>点击预览中的图标调整顺序，下方选择要显示的工具。修改即时生效。</p>
+    <h3>{t("选区浮动工具栏")}<button onClick={() => { setToolbar(defaultToolbar); setSelected(defaultToolbar[0]); }}>{t("恢复默认")}</button></h3>
+    <p>{t("点击预览中的图标调整顺序，下方选择要显示的工具。修改即时生效。")}</p>
     <div className="toolbar-preview-stage">
-      {toolbar.length ? <FormatToolbar actions={toolbar} selected={current} onSelect={setSelected} preview /> : <span className="toolbar-empty" role="status">工具栏已隐藏，选择下方图标即可添加</span>}
-      <span className="toolbar-preview-selection">选中一段文字，让想法自然发生。</span>
+      {toolbar.length ? <FormatToolbar actions={toolbar} selected={current} onSelect={setSelected} preview /> : <span className="toolbar-empty" role="status">{t("工具栏已隐藏，选择下方图标即可添加")}</span>}
+      <span className="toolbar-preview-selection">{t("选中一段文字，让想法自然发生。")}</span>
     </div>
     <div className="toolbar-adjustments">
-      <span>{current ? formatLabel(current) : '未选择工具'}</span>
-      <button aria-label="向左移动所选工具" title="向左移动" disabled={index <= 0} onClick={() => move(-1)}><ArrowLeft size={15} /></button>
-      <button aria-label="向右移动所选工具" title="向右移动" disabled={index < 0 || index >= toolbar.length - 1} onClick={() => move(1)}><ArrowRight size={15} /></button>
-      <button aria-label="移除所选工具" title="从工具栏移除" disabled={!current} onClick={() => setToolbar(toolbar.filter(id => id !== current))}><X size={15} /></button>
+      <span>{current ? formatLabel(current) : t('未选择工具')}</span>
+      <button aria-label={t("向左移动所选工具")} title={t("向左移动")} disabled={index <= 0} onClick={() => move(-1)}><ArrowLeft size={15} /></button>
+      <button aria-label={t("向右移动所选工具")} title={t("向右移动")} disabled={index < 0 || index >= toolbar.length - 1} onClick={() => move(1)}><ArrowRight size={15} /></button>
+      <button aria-label={t("移除所选工具")} title={t("从工具栏移除")} disabled={!current} onClick={() => setToolbar(toolbar.filter(id => id !== current))}><X size={15} /></button>
     </div>
-    <div className="toolbar-palette" role="group" aria-label="可选工具">{toolbarOptions.map(([id, label]) => <button key={id} aria-label={label} title={label} aria-pressed={toolbar.includes(id)} onClick={() => {
+    <div className="toolbar-palette" role="group" aria-label={t("可选工具")}>{toolbarOptions.map(([id, label]) => <button key={id} aria-label={t(label)} title={t(label)} aria-pressed={toolbar.includes(id)} onClick={() => {
       if (toolbar.includes(id)) setToolbar(toolbar.filter(value => value !== id));
       else { setToolbar([...toolbar, id]); setSelected(id); }
     }}><FormatIcon action={id} /><span className="toolbar-palette-dot" /></button>)}</div>

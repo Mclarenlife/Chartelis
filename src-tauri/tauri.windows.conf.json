@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Chartelis",
+        "decorations": false,
+        "shadow": true,
+        "width": 1280,
+        "height": 880,
+        "minWidth": 720,
+        "minHeight": 540,
+        "center": true,
+        "backgroundColor": "#faf9f6",
+        "dragDropEnabled": false
+      }
+    ]
+  }
+}

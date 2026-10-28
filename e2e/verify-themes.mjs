@@ -3,7 +3,7 @@ import { chromium, expect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 const browser = await chromium.launch({ channel: process.env.EXPORT_BROWSER || 'msedge', headless: true });
 try {
-  const context = await browser.newContext({ colorScheme: 'dark', viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ locale: 'zh-CN', colorScheme: 'dark', viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

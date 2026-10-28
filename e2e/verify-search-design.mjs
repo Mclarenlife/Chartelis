@@ -1,7 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:1420/');
   await page.keyboard.press('Control+n');

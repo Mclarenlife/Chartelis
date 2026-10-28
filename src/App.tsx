@@ -1,10 +1,16 @@
+import { t, tf } from './i18n';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, CircleHelp, FileText, FolderOpen, ScanLine, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Settings2, Sun, X, Undo2, Redo2, Download, Code2, Eye, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import AppMenu, { type MenuGroups } from './AppMenu';
 import Settings from './Settings';
+import AIAssistant from './AIAssistant';
+import { Sparkles } from 'lucide-react';
+import { useLanguage, needsLanguageChoice } from './i18n';
+import LanguageWelcome from './LanguageWelcome';
 import { capturePreview } from './preview-export';
-import { macDesktop } from './platform';
+import { macDesktop, windowsDesktop } from './platform';
+import WindowControls from './WindowControls';
 import CountSettings from './CountSettings';
 import { writingThemes, writingColor, parseCount, countText, countLabels } from './writing-preferences';
 import ReferenceSheet from './ReferenceSheet';
@@ -28,7 +34,7 @@ function Modal({ children, title, onClose }: { children: ReactNode; title: strin
   useEffect(() => { const el = dialog.current!; el.showModal(); return () => el.close(); }, []);
   return <dialog ref={dialog} className="modal" aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === dialog.current) onClose(); }}>
     <motion.div initial={{ opacity: 0, y: 12, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .2 }}>
-      <div className="modal-heading"><h2>{title}</h2><button className="icon-button" aria-label="关闭对话框" onClick={onClose}><X size={18} /></button></div>
+      <div className="modal-heading"><h2>{title}</h2><button className="icon-button" aria-label={t("关闭对话框")} onClick={onClose}><X size={18} /></button></div>
       {children}
     </motion.div>
   </dialog>;
@@ -37,6 +43,9 @@ function Modal({ children, title, onClose }: { children: ReactNode; title: strin
 function getPreference(key: string, fallback: string) { try { return localStorage.getItem(key) || fallback; } catch { return fallback; } }
 
 export default function App() {
+  useLanguage();
+  const [chooseLanguage, setChooseLanguage] = useState(needsLanguageChoice);
+  const [aiOpen, setAiOpen] = useState(false);
   const [initialWorkspace] = useState(restoreWorkspace);
   const [docs, setDocs] = useState<DocumentEntry[]>(initialWorkspace.docs);
   const [activeId, setActiveId] = useState(initialWorkspace.activeId);
@@ -49,7 +58,7 @@ export default function App() {
   const [sidebarTab, setSidebarTab] = useState<'files' | 'outline'>('files');
   const [search, setSearch] = useState('');
   const [headings, setHeadings] = useState<Heading[]>([]);
-  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(() => docs.some(isDirty) ? { text: '已恢复上次工作区，未保存草稿已保留。' } : null);
+  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(() => docs.some(isDirty) ? { text: t('已恢复上次工作区，未保存草稿已保留。') } : null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [modal, setModal] = useState<'settings' | 'help' | 'export' | 'markdown' | 'latex' | 'characters' | 'documents' | 'properties' | 'reload' | 'count' | null>(null);
@@ -117,7 +126,7 @@ export default function App() {
             activeRef.current = doc.id; setActiveId(doc.id);
             setRecent(current => [path, ...current.filter(item => !sameFilePath(item, path))].slice(0, 12));
             setHeadings([]); setSearch(''); setSidebarTab('files');
-          } catch (error) { notify(`打开失败：${String(error)}`, true); }
+          } catch (error) { notify(tf`打开失败：${String(error)}`, true); }
         }
       } finally { busyRef.current = false; setBusy(false); }
     })();
@@ -143,8 +152,8 @@ export default function App() {
     try {
       const preview = capturePreview(sessions.current.get(snapshot.id)?.previewHTML() ?? '', font);
       const { exportDocument } = await import('./export');
-      if (await exportDocument(snapshot, format, preview)) { setModal(null); notify('文稿已导出'); }
-    } catch (error) { if (!isCancelled(error)) notify(`导出失败：${String(error)}`, true); }
+      if (await exportDocument(snapshot, format, preview)) { setModal(null); notify(t('文稿已导出')); }
+    } catch (error) { if (!isCancelled(error)) notify(tf`导出失败：${String(error)}`, true); }
     finally { busyRef.current = false; setBusy(false); }
   };
 
@@ -175,7 +184,7 @@ export default function App() {
   useEffect(() => {
     const title = `Chartelis - ${active.name}`;
     document.title = title;
-    if (desktop) void import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setTitle(title)).catch(error => notify(`窗口标题更新失败：${String(error)}`, true));
+    if (desktop) void import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setTitle(title)).catch(error => notify(tf`窗口标题更新失败：${String(error)}`, true));
   }, [active.name, notify]);
   const remember = (path?: string) => { if (path) setRecent(current => [path, ...current.filter(item => item !== path)].slice(0, 12)); };
   const switchDocument = (id: string) => {
@@ -188,7 +197,7 @@ export default function App() {
   const newDocument = (template?: PluginTemplate) => {
     flush();
     const content = template ? renderTemplate(template) : null;
-    const untitled = createDocument(content?.filename ?? `未命名${docsRef.current.filter(doc => doc.name.startsWith('未命名')).length + 1}.md`, content?.markdown ?? '');
+    const untitled = createDocument(content?.filename ?? tf`未命名${docsRef.current.filter(doc => /^(未命名|Untitled)/.test(doc.name)).length + 1}.md`, content?.markdown ?? '');
     if (content) untitled.savedMarkdown = '';
     updateDocs(current => [...current, untitled]);
     activeRef.current = untitled.id;
@@ -205,8 +214,8 @@ export default function App() {
       const text = session.selectionText();
       const result = runSelectionCommand(command, text);
       if (text !== result) { session.replaceSelection(result); flush(); sessionChanged(); }
-      notify(text === result ? '选中文字无需修改' : `已执行「${command.name}」，可撤销`);
-    } catch (error) { notify(error instanceof Error ? error.message : '命令执行失败', true); }
+      notify(text === result ? t('选中文字无需修改') : tf`已执行「${command.name}」，可撤销`);
+    } catch (error) { notify(error instanceof Error ? error.message : t('命令执行失败'), true); }
   };
   const openFile = async () => {
     if (busyRef.current) return;
@@ -221,8 +230,8 @@ export default function App() {
       updateDocs(current => [...current, doc]);
       activeRef.current = doc.id; setActiveId(doc.id);
       setHeadings([]); setSearch(''); setSidebarTab('files');
-      notify(`已打开 ${doc.name}`);
-    } catch (error) { if (!isCancelled(error)) notify(`打开失败：${String(error)}`, true); }
+      notify(tf`已打开 ${doc.name}`);
+    } catch (error) { if (!isCancelled(error)) notify(tf`打开失败：${String(error)}`, true); }
     finally { busyRef.current = false; setBusy(false); }
   };
   const saveFile = async (saveAs = false, id = activeRef.current) => {
@@ -234,13 +243,13 @@ export default function App() {
     try {
       const saved = await saveDocument(snapshot, saveAs);
       if (!saved) return false;
-      if (saved.exported) { notify('已下载 Markdown 副本；请确认下载完成。草稿仍保留。'); return false; }
+      if (saved.exported) { notify(t('已下载 Markdown 副本；请确认下载完成。草稿仍保留。')); return false; }
       flush();
       updateDocs(current => current.map(doc => doc.id === id ? markSaved(doc, snapshot.markdown, saved) : doc));
       remember(saved.path);
-      notify('文稿已保存');
+      notify(t('文稿已保存'));
       return true;
-    } catch (error) { if (!isCancelled(error)) notify(`保存失败：${String(error)}`, true); return false; }
+    } catch (error) { if (!isCancelled(error)) notify(tf`保存失败：${String(error)}`, true); return false; }
     finally { busyRef.current = false; setBusy(false); }
   };
   const removeDocument = (id: string) => {
@@ -313,19 +322,19 @@ export default function App() {
     const target = docsRef.current.find(doc => doc.id === activeRef.current)!;
     const baseline = target.markdown;
     const text = await readDocument(target);
-    if (!docsRef.current.some(doc => doc.id === target.id && doc.markdown === baseline)) throw new Error('读取期间文稿已改变，请重新载入');
+    if (!docsRef.current.some(doc => doc.id === target.id && doc.markdown === baseline)) throw new Error(t('读取期间文稿已改变，请重新载入'));
     // Keep the prior content in the session undo history.
     sessions.current.get(target.id)?.replaceMarkdown(text);
     const decoded = createDocument(target.name, text);
     updateDocs(current => current.map(doc => doc.id === target.id ? { ...doc, markdown: text, savedMarkdown: text, diskContent: text, bom: decoded.bom, lineEnding: decoded.lineEnding } : doc));
-    setModal(null); notify('已从磁盘重新载入，可撤销此次替换');
+    setModal(null); notify(t('已从磁盘重新载入，可撤销此次替换'));
   });
   const clipboard = (action: 'copy' | 'cut' | 'paste' | 'markdown' | 'html') => guard(async () => {
     const session = sessions.current.get(activeRef.current); if (!session) return;
     const cursor = session.snapshot();
     if (action === 'paste') {
       const text = await readClipboard();
-      if (session !== sessions.current.get(activeRef.current) || JSON.stringify(cursor) !== JSON.stringify(session.snapshot())) throw new Error('插入位置已改变，请重新粘贴');
+      if (session !== sessions.current.get(activeRef.current) || JSON.stringify(cursor) !== JSON.stringify(session.snapshot())) throw new Error(t('插入位置已改变，请重新粘贴'));
       session.replaceSelection(text); return;
     }
     let text = action === 'markdown' || action === 'html' ? session.getMarkdown() : session.selectionText();
@@ -339,57 +348,58 @@ export default function App() {
   });
   const menus: MenuGroups = {
     文件: [
-      { label: '新建文稿', shortcut: `${modKey} N`, action: newDocument },
-      { label: '从模板新建', disabled: busy || !enabledPlugins.some(plugin => plugin.templates.length), children: enabledPlugins.flatMap(plugin => plugin.templates.map(template => ({ label: `${template.name} · ${plugin.name}`, action: () => newDocument(template) }))) },
-      { label: '打开…', shortcut: `${modKey} O`, action: () => void openFile(), disabled: busy },
-      { label: '打开文件夹…', action: () => void openFolder(), disabled: busy || folderBusy },
-      ...(folder ? [{ label: '关闭文件夹', disabled: folderBusy, action: () => { setFolder(null); setSidebarTab('files'); } }] : []),
-      { label: '快速打开…', shortcut: `${modKey} P`, action: () => { setSearch(''); setModal('documents'); } },
-      ...(desktop ? [{ label: '打开最近文件', disabled: !recent.length, children: recent.map(path => ({ label: path, action: () => void openRecent(path) })) }] : []),
-      { label: '从磁盘重新加载', action: () => { flush(); if (isDirty(docsRef.current.find(doc => doc.id === activeId)!)) setModal('reload'); else void reload(); }, disabled: busy || !active.path && !active.handle, separator: true },
-      { label: '保存', shortcut: `${modKey} S`, action: () => void saveFile(), disabled: busy },
-      { label: '另存为…', shortcut: `${modKey} Shift S`, action: () => void saveFile(true), disabled: busy },
-      { label: '保存全部打开的文稿', action: () => void guard(async () => { flush(); for (const doc of [...docsRef.current]) if (isDirty(doc) || !doc.path && !doc.handle) if (!await saveFile(false, doc.id)) break; }), disabled: busy },
-      { label: '文稿属性 / 字数统计', action: () => setModal('properties'), separator: true },
-      { label: '导出', children: [['pdf', 'PDF 文档'], ['png', 'PNG 图片'], ['docx', 'Word 文档']].map(([id, label]) => ({ label, action: () => void exportFile(id as 'pdf' | 'png' | 'docx'), disabled: busy })) },
-      { label: '偏好设置', shortcut: `${modKey} ,`, action: () => setModal('settings'), separator: true },
-      { label: '关闭当前文稿', shortcut: `${modKey} W`, action: () => closeDocument(activeId), disabled: busy },
+      { label: t('新建文稿'), shortcut: `${modKey} N`, action: newDocument },
+      { label: t('从模板新建'), disabled: busy || !enabledPlugins.some(plugin => plugin.templates.length), children: enabledPlugins.flatMap(plugin => plugin.templates.map(template => ({ label: `${template.name} · ${plugin.name}`, action: () => newDocument(template) }))) },
+      { label: t('打开…'), shortcut: `${modKey} O`, action: () => void openFile(), disabled: busy },
+      { label: t('打开文件夹…'), action: () => void openFolder(), disabled: busy || folderBusy },
+      ...(folder ? [{ label: t('关闭文件夹'), disabled: folderBusy, action: () => { setFolder(null); setSidebarTab('files'); } }] : []),
+      { label: t('快速打开…'), shortcut: `${modKey} P`, action: () => { setSearch(''); setModal('documents'); } },
+      ...(desktop ? [{ label: t('打开最近文件'), disabled: !recent.length, children: recent.map(path => ({ label: path, action: () => void openRecent(path) })) }] : []),
+      { label: t('从磁盘重新加载'), action: () => { flush(); if (isDirty(docsRef.current.find(doc => doc.id === activeId)!)) setModal('reload'); else void reload(); }, disabled: busy || !active.path && !active.handle, separator: true },
+      { label: t('保存'), shortcut: `${modKey} S`, action: () => void saveFile(), disabled: busy },
+      { label: t('另存为…'), shortcut: `${modKey} Shift S`, action: () => void saveFile(true), disabled: busy },
+      { label: t('保存全部打开的文稿'), action: () => void guard(async () => { flush(); for (const doc of [...docsRef.current]) if (isDirty(doc) || !doc.path && !doc.handle) if (!await saveFile(false, doc.id)) break; }), disabled: busy },
+      { label: t('文稿属性 / 字数统计'), action: () => setModal('properties'), separator: true },
+      { label: t('导出'), children: [['pdf', t('PDF 文档')], ['png', t('PNG 图片')], ['docx', t('Word 文档')]].map(([id, label]) => ({ label, action: () => void exportFile(id as 'pdf' | 'png' | 'docx'), disabled: busy })) },
+      { label: t('偏好设置'), shortcut: `${modKey} ,`, action: () => setModal('settings'), separator: true },
+      { label: t('关闭当前文稿'), shortcut: `${modKey} W`, action: () => closeDocument(activeId), disabled: busy },
     ],
     编辑: [
-      { label: '撤销', shortcut: `${modKey} Z`, action: () => sessions.current.get(activeId)?.undo(), disabled: readOnly || !historyState.undo },
-      { label: '重做', shortcut: `${modKey} Shift Z`, action: () => sessions.current.get(activeId)?.redo(), disabled: readOnly || !historyState.redo },
-      { label: '剪切', shortcut: `${modKey} X`, action: () => void clipboard('cut'), disabled: readOnly, separator: true },
-      { label: '复制纯文本', shortcut: `${modKey} C`, action: () => void clipboard('copy') },
-      { label: '粘贴纯文本', shortcut: `${modKey} Shift V`, action: () => void clipboard('paste'), disabled: readOnly },
-      { label: '复制全文 Markdown', action: () => void clipboard('markdown') },
-      { label: '复制全文 HTML', action: () => void clipboard('html') },
-      { label: '全选', shortcut: `${modKey} A`, action: () => sessions.current.get(activeId)?.selectAll(), separator: true },
-      { label: '删除选中内容', action: () => sessions.current.get(activeId)?.replaceSelection(''), disabled: readOnly },
-      { label: '插件选区命令', disabled: readOnly || busy || !enabledPlugins.some(plugin => plugin.commands.length), children: enabledPlugins.flatMap(plugin => plugin.commands.map(command => ({ label: `${command.name} · ${plugin.name}`, action: () => runPluginCommand(plugin.id, command) }))) },
-      ...formatGroups.map(group => ({ label: group.label === '插入' ? '插入 / 数学工具' : group.label, separator: group.label === '文字', children: group.items.map(([id, label]) => ({ label, action: () => sessions.current.get(activeId)?.format(id), disabled: readOnly })) })),
-      { label: '查找和替换', shortcut: `${modKey} F`, action: () => sessions.current.get(activeId)?.search(), separator: true },
+      { label: t('撤销'), shortcut: `${modKey} Z`, action: () => sessions.current.get(activeId)?.undo(), disabled: readOnly || !historyState.undo },
+      { label: t('重做'), shortcut: `${modKey} Shift Z`, action: () => sessions.current.get(activeId)?.redo(), disabled: readOnly || !historyState.redo },
+      { label: t('剪切'), shortcut: `${modKey} X`, action: () => void clipboard('cut'), disabled: readOnly, separator: true },
+      { label: t('复制纯文本'), shortcut: `${modKey} C`, action: () => void clipboard('copy') },
+      { label: t('粘贴纯文本'), shortcut: `${modKey} Shift V`, action: () => void clipboard('paste'), disabled: readOnly },
+      { label: t('复制全文 Markdown'), action: () => void clipboard('markdown') },
+      { label: t('复制全文 HTML'), action: () => void clipboard('html') },
+      { label: t('全选'), shortcut: `${modKey} A`, action: () => sessions.current.get(activeId)?.selectAll(), separator: true },
+      { label: t('删除选中内容'), action: () => sessions.current.get(activeId)?.replaceSelection(''), disabled: readOnly },
+      { label: t('插件选区命令'), disabled: readOnly || busy || !enabledPlugins.some(plugin => plugin.commands.length), children: enabledPlugins.flatMap(plugin => plugin.commands.map(command => ({ label: `${command.name} · ${plugin.name}`, action: () => runPluginCommand(plugin.id, command) }))) },
+      ...formatGroups.map(group => ({ label: group.label === '插入' ? t('插入 / 数学工具') : t(group.label), separator: group.label === '文字', children: group.items.map(([id, label]) => ({ label: t(label), action: () => sessions.current.get(activeId)?.format(id), disabled: readOnly })) })),
+      { label: t('查找和替换'), shortcut: `${modKey} F`, action: () => sessions.current.get(activeId)?.search(), separator: true },
     ],
     视图: [
-      { label: '显示侧栏', checked: showSidebar, disabled: !folder && (sidebarTab !== 'outline' || outlinePosition !== 'left'), shortcut: `${modKey} \\`, action: () => setSidebarOpen(value => !value) },
-      { label: '文稿列表', disabled: !folder, action: () => { setSidebarOpen(true); setSidebarTab('files'); } },
-      { label: '大纲', action: () => { if (outlinePosition === 'left') { setSidebarOpen(true); setSidebarTab('outline'); } } },
-      { label: '源码模式', checked: editorMode === 'source', shortcut: `${modKey} Shift M`, action: () => sessions.current.get(activeId)?.setMode(editorMode === 'source' ? 'preview' : 'source'), separator: true },
-      { label: '只读模式', checked: readOnly, action: () => setReadOnly(value => !value) },
-      { label: '专注模式', checked: focusMode, shortcut: `${modKey} Shift F`, action: () => setFocusMode(value => !value) },
-      { label: '显示顶栏', checked: topbarVisible, action: () => setTopbarVisible(value => !value), separator: true },
-      { label: '显示状态栏', checked: statusVisible, action: () => setStatusVisible(value => !value) },
-      { label: '定制浮动工具栏…', action: () => setModal('settings') },
-      { label: '切换全屏', checked: fullscreen, action: () => void toggleFullscreen() },
-      ...(desktop ? [{ label: '窗口保持最前', checked: onTop, action: () => void guard(async () => { await (await import('@tauri-apps/api/window')).getCurrentWindow().setAlwaysOnTop(!onTop); setOnTop(!onTop); }) }] : []),
-      { label: '放大文字', action: () => setFontSize(value => Math.min(28, value + 1)), separator: true },
-      { label: '缩小文字', action: () => setFontSize(value => Math.max(13, value - 1)) },
-      { label: '恢复默认字号', action: () => setFontSize(17) },
+      { label: t('AI 助手'), checked: aiOpen, action: () => setAiOpen(value => !value) },
+      { label: t('显示侧栏'), checked: showSidebar, disabled: !folder && (sidebarTab !== 'outline' || outlinePosition !== 'left'), shortcut: `${modKey} \\`, action: () => setSidebarOpen(value => !value) },
+      { label: t('文稿列表'), disabled: !folder, action: () => { setSidebarOpen(true); setSidebarTab('files'); } },
+      { label: t('大纲'), action: () => { if (outlinePosition === 'left') { setSidebarOpen(true); setSidebarTab('outline'); } } },
+      { label: t('源码模式'), checked: editorMode === 'source', shortcut: `${modKey} Shift M`, action: () => sessions.current.get(activeId)?.setMode(editorMode === 'source' ? 'preview' : 'source'), separator: true },
+      { label: t('只读模式'), checked: readOnly, action: () => setReadOnly(value => !value) },
+      { label: t('专注模式'), checked: focusMode, shortcut: `${modKey} Shift F`, action: () => setFocusMode(value => !value) },
+      { label: t('显示顶栏'), checked: topbarVisible, action: () => setTopbarVisible(value => !value), separator: true },
+      { label: t('显示状态栏'), checked: statusVisible, action: () => setStatusVisible(value => !value) },
+      { label: t('定制浮动工具栏…'), action: () => setModal('settings') },
+      { label: t('切换全屏'), checked: fullscreen, action: () => void toggleFullscreen() },
+      ...(desktop ? [{ label: t('窗口保持最前'), checked: onTop, action: () => void guard(async () => { await (await import('@tauri-apps/api/window')).getCurrentWindow().setAlwaysOnTop(!onTop); setOnTop(!onTop); }) }] : []),
+      { label: t('放大文字'), action: () => setFontSize(value => Math.min(28, value + 1)), separator: true },
+      { label: t('缩小文字'), action: () => setFontSize(value => Math.max(13, value - 1)) },
+      { label: t('恢复默认字号'), action: () => setFontSize(17) },
     ],
     帮助: [
-      { label: 'Markdown 语法表', action: () => setModal('markdown') },
-      { label: 'LaTeX 语法表', action: () => setModal('latex') },
-      { label: '字符表', action: () => setModal('characters') },
-      { label: '快捷键与关于', action: () => setModal('help'), separator: true },
+      { label: t('Markdown 语法表'), action: () => setModal('markdown') },
+      { label: t('LaTeX 语法表'), action: () => setModal('latex') },
+      { label: t('字符表'), action: () => setModal('characters') },
+      { label: t('快捷键与关于'), action: () => setModal('help'), separator: true },
     ],
   };
   const handlers = useRef({ openFile, newDocument, saveFile, flush, persist, closeDocument, searchDocument: () => sessions.current.get(activeRef.current)?.search() });
@@ -397,6 +407,7 @@ export default function App() {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      if ((event.target as HTMLElement)?.closest?.('.ai-panel')) return;
       if (event.isComposing) return;
       if (event.defaultPrevented) return;
       if (event.key === 'Escape') { setFocusMode(false); return; }
@@ -429,7 +440,7 @@ export default function App() {
         if (busyRef.current || !persisted) { event.preventDefault(); setCloseTarget('app'); }
       });
       if (disposed) unlisten(); else dispose = unlisten;
-    }).catch(error => notify(`窗口关闭保护未能启用：${String(error)}`, true));
+    }).catch(error => notify(tf`窗口关闭保护未能启用：${String(error)}`, true));
     return () => {
       disposed = true; dispose?.();
       window.removeEventListener('keydown', keydown);
@@ -437,44 +448,45 @@ export default function App() {
     };
   }, [notify]);
 
-  return <div className={`app ${macDesktop ? 'mac-desktop' : ''} ${focusMode ? 'focus-mode' : ''}`} style={{ '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
-      {macDesktop && !topbarVisible && <div className="mac-window-strip" data-tauri-drag-region><button className="icon-button" aria-label="展开顶栏" title="展开顶栏" onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button></div>}
-      <header className="topbar" hidden={!topbarVisible} data-tauri-drag-region={macDesktop ? true : undefined}>
-        <div className="topbar-left" data-tauri-drag-region={macDesktop ? true : undefined}>          <div className="brand" data-tauri-drag-region={macDesktop ? true : undefined}><img src="/icon.png" alt="Chartelis 图标" draggable={false} data-tauri-drag-region={macDesktop ? true : undefined} /><span className="brand-name" data-tauri-drag-region={macDesktop ? true : undefined}>Chartelis<span className="brand-dot" data-tauri-drag-region={macDesktop ? true : undefined}>.</span></span><button className="icon-button brand-settings" aria-label="设置" title="设置" onClick={() => setModal('settings')}><Settings2 size={16} /></button></div>
+  return <div className={`app ${macDesktop ? 'mac-desktop' : windowsDesktop ? 'windows-desktop' : ''} ${focusMode ? 'focus-mode' : ''}`} style={{ '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
+      {chooseLanguage && <LanguageWelcome onDone={() => setChooseLanguage(false)} />}
+      {(macDesktop || windowsDesktop) && !topbarVisible && <div className="window-strip" data-tauri-drag-region><button className="icon-button" aria-label={t("展开顶栏")} title={t("展开顶栏")} onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button><div className="window-drag-area" data-tauri-drag-region />{windowsDesktop && <WindowControls onError={notify} />}</div>}
+      <header className="topbar" hidden={!topbarVisible} data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined}>
+        <div className="topbar-left" data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined}><button className="icon-button header-settings" aria-label={t("设置")} title={t("设置")} onClick={() => setModal('settings')}><Settings2 size={16} /></button>
           <AppMenu groups={menus} />
-<button className="icon-button" aria-label="撤销" title={`撤销 · ${modKey} Z`} disabled={readOnly || !historyState.undo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.undo()}><Undo2 size={18} /></button><button className="icon-button" aria-label="重做" title={`重做 · ${modKey} Shift Z`} disabled={readOnly || !historyState.redo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.redo()}><Redo2 size={18} /></button></div>
-        <div className="topbar-actions"><span className="save-state">{busy ? '处理中…' : isDirty(active) ? '尚未保存' : active.path || active.handle ? '已保存' : '本地草稿'}</span><button className="save-button" onClick={() => void saveFile()} disabled={busy} title={`保存 · ${modKey} S`}><Save size={15} /><span>保存</span></button><button className="icon-button" aria-label="导出文稿" title="导出 PDF、图片、Word" onClick={() => setModal('export')} disabled={busy}><Download size={17} /></button><span className="topbar-separator" /><button className={`icon-button ${focusMode ? 'is-active' : ''}`} aria-label={focusMode ? '退出专注模式' : '专注模式'} title={`专注模式 · ${modKey} Shift F`} onClick={() => setFocusMode(value => !value)}><ScanLine size={18} /></button><button className="icon-button" aria-label={darkTheme ? '切换浅色主题' : '切换深色主题'} onClick={() => setTheme(darkTheme ? 'light' : 'dark')}>{darkTheme ? <Sun size={18} /> : <Moon size={17} />}</button><button className="icon-button" aria-label="收起顶栏" title="收起顶栏" onClick={() => setTopbarVisible(false)}><ChevronUp size={17} /></button></div>
+<button className="icon-button" aria-label={t("撤销")} title={tf`撤销 · ${modKey} Z`} disabled={readOnly || !historyState.undo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.undo()}><Undo2 size={18} /></button><button className="icon-button" aria-label={t("重做")} title={tf`重做 · ${modKey} Shift Z`} disabled={readOnly || !historyState.redo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.redo()}><Redo2 size={18} /></button></div>
+        <div className="window-drag-area" data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined} /><div className="topbar-actions"><button className={`icon-button ${aiOpen ? 'is-active' : ''}`} aria-label={t('AI 助手')} title={t('AI 助手')} aria-expanded={aiOpen} aria-controls="ai-assistant" onClick={() => setAiOpen(value => !value)}><Sparkles size={18} /></button><span className="save-state">{busy ? t('处理中…') : isDirty(active) ? t('尚未保存') : active.path || active.handle ? t('已保存') : t('本地草稿')}</span><button className="save-button" onClick={() => void saveFile()} disabled={busy} title={tf`保存 · ${modKey} S`}><Save size={15} /><span>{t("保存")}</span></button><button className="icon-button" aria-label={t("导出文稿")} title={t("导出 PDF、图片、Word")} onClick={() => setModal('export')} disabled={busy}><Download size={17} /></button><span className="topbar-separator" /><button className={`icon-button ${focusMode ? 'is-active' : ''}`} aria-label={focusMode ? t('退出专注模式') : t('专注模式')} title={tf`专注模式 · ${modKey} Shift F`} onClick={() => setFocusMode(value => !value)}><ScanLine size={18} /></button><button className="icon-button" aria-label={darkTheme ? t('切换浅色主题') : t('切换深色主题')} onClick={() => setTheme(darkTheme ? 'light' : 'dark')}>{darkTheme ? <Sun size={18} /> : <Moon size={17} />}</button><button className="icon-button" aria-label={t("收起顶栏")} title={t("收起顶栏")} onClick={() => setTopbarVisible(false)}><ChevronUp size={17} /></button>{windowsDesktop && topbarVisible && <WindowControls onError={notify} />}</div>
       </header>
     <div className="workspace-layout">
     <AnimatePresence initial={false}>
       {showSidebar && <motion.aside className="sidebar" initial={{ width: 0, opacity: 0 }} animate={{ width: 254, opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 34 }}>
         <div className="sidebar-inner">
-          <div className="sidebar-tabs" role="tablist" aria-label="侧栏内容">
-            {((outlinePosition === 'right' ? ['files'] : folder ? ['files', 'outline'] : ['outline']) as ('files' | 'outline')[]).map(tab => <button key={tab} role="tab" aria-selected={sidebarTab === tab} onClick={() => setSidebarTab(tab)} className={sidebarTab === tab ? 'selected' : ''}>{tab === 'files' ? '文稿' : '大纲'}{sidebarTab === tab && <motion.span layoutId="sidebar-tab" className="tab-underline" />}</button>)}
+          <div className="sidebar-tabs" role="tablist" aria-label={t("侧栏内容")}>
+            {((outlinePosition === 'right' ? ['files'] : folder ? ['files', 'outline'] : ['outline']) as ('files' | 'outline')[]).map(tab => <button key={tab} role="tab" aria-selected={sidebarTab === tab} onClick={() => setSidebarTab(tab)} className={sidebarTab === tab ? 'selected' : ''}>{tab === 'files' ? t('文稿') : t('大纲')}{sidebarTab === tab && <motion.span layoutId="sidebar-tab" className="tab-underline" />}</button>)}
             <span className="tab-count">{sidebarTab === 'files' ? docs.length : headings.length}</span>
           </div>
           {folder && (sidebarTab === 'files' || outlinePosition === 'right') ? <>
-            <div className="workspace-folder-heading"><FolderOpen size={15} /><span title={folder.trail.map(item => item.name).join(' / ')}>{folder.trail.at(-1)?.name}</span><button className="icon-button" aria-label="刷新文件夹" disabled={folderBusy} onClick={() => void browseFolder(folder.trail)}><RefreshCw size={14} /></button></div>
-            {folder.trail.length > 1 && <button className="folder-back" disabled={folderBusy} onClick={() => void browseFolder(folder.trail.slice(0, -1))}>返回上一级</button>}
-            <nav className="workspace-folder-files" aria-label="文件夹中的文稿">{folder.items.map(item => <button key={item.key} disabled={folderBusy || busy} onClick={() => openFolderItem(item)} title={item.name}>{item.directory ? <FolderOpen size={15} /> : <FileText size={15} />}<span>{item.name}</span></button>)}{!folder.items.length && <p className="sidebar-empty">此文件夹没有 Markdown 文稿</p>}</nav>
-            <div className="opened-documents-label">已打开的文稿</div>
-            <label className="search"><Search size={14} /><input aria-label="搜索已打开的文稿" placeholder="查找文稿…" value={search} onChange={event => setSearch(event.target.value)} />{search && <button aria-label="清除搜索" onClick={() => setSearch('')}><X size={12} /></button>}</label>
+            <div className="workspace-folder-heading"><FolderOpen size={15} /><span title={folder.trail.map(item => item.name).join(' / ')}>{folder.trail.at(-1)?.name}</span><button className="icon-button" aria-label={t("刷新文件夹")} disabled={folderBusy} onClick={() => void browseFolder(folder.trail)}><RefreshCw size={14} /></button></div>
+            {folder.trail.length > 1 && <button className="folder-back" disabled={folderBusy} onClick={() => void browseFolder(folder.trail.slice(0, -1))}>{t("返回上一级")}</button>}
+            <nav className="workspace-folder-files" aria-label={t("文件夹中的文稿")}>{folder.items.map(item => <button key={item.key} disabled={folderBusy || busy} onClick={() => openFolderItem(item)} title={item.name}>{item.directory ? <FolderOpen size={15} /> : <FileText size={15} />}<span>{item.name}</span></button>)}{!folder.items.length && <p className="sidebar-empty">{t("此文件夹没有 Markdown 文稿")}</p>}</nav>
+            <div className="opened-documents-label">{t("已打开的文稿")}</div>
+            <label className="search"><Search size={14} /><input aria-label={t("搜索已打开的文稿")} placeholder={t("查找文稿…")} value={search} onChange={event => setSearch(event.target.value)} />{search && <button aria-label={t("清除搜索")} onClick={() => setSearch('')}><X size={12} /></button>}</label>
             <div className={`document-list ${listStyle}`}>
               {docs.filter(doc => doc.name.toLowerCase().includes(search.toLowerCase())).map(doc => <div key={doc.id} className={`document-item ${doc.id === activeId ? 'current' : ''}`}>
-                <button className="document-select" onClick={() => switchDocument(doc.id)} title={doc.path || doc.name} aria-current={doc.id === activeId ? 'page' : undefined}><FileText size={16} strokeWidth={1.5} /><span className="document-copy"><span className="document-name">{doc.name.replace(/\.(md|markdown|mdown)$/i, '')}</span>{listStyle === 'detailed' && <span className="document-excerpt">{documentExcerpt(doc.markdown) || '空白文稿'}</span>}</span>{isDirty(doc) && <i className="dirty-dot" aria-label="未保存" />}</button>
-                <button className="document-close" aria-label={`关闭 ${doc.name}`} onClick={() => closeDocument(doc.id)} disabled={busy}><X size={13} /></button>
+                <button className="document-select" onClick={() => switchDocument(doc.id)} title={doc.path || doc.name} aria-current={doc.id === activeId ? 'page' : undefined}><FileText size={16} strokeWidth={1.5} /><span className="document-copy"><span className="document-name">{doc.name.replace(/\.(md|markdown|mdown)$/i, '')}</span>{listStyle === 'detailed' && <span className="document-excerpt">{documentExcerpt(doc.markdown) || t('空白文稿')}</span>}</span>{isDirty(doc) && <i className="dirty-dot" aria-label={t("未保存")} />}</button>
+                <button className="document-close" aria-label={tf`关闭 ${doc.name}`} onClick={() => closeDocument(doc.id)} disabled={busy}><X size={13} /></button>
               </div>)}
-              {!docs.some(doc => doc.name.toLowerCase().includes(search.toLowerCase())) && <p className="sidebar-empty">没有找到这篇文稿</p>}
+              {!docs.some(doc => doc.name.toLowerCase().includes(search.toLowerCase())) && <p className="sidebar-empty">{t("没有找到这篇文稿")}</p>}
             </div>
-          </> : <nav className="outline" aria-label="文稿大纲">{headings.length ? headings.map((heading, i) => <button key={`${heading.pos}-${i}`} style={{ paddingLeft: 14 + (heading.level - 1) * 12 }} onClick={() => sessions.current.get(activeId)?.scrollTo(heading.pos)}><span className="outline-marker">{heading.level === 1 ? '◦' : '—'}</span><span>{heading.text || '未命名标题'}</span></button>) : <p className="sidebar-empty">写下一个标题，<br />思路就会在这里展开。</p>}</nav>}
+          </> : <nav className="outline" aria-label={t("文稿大纲")}>{headings.length ? headings.map((heading, i) => <button key={`${heading.pos}-${i}`} style={{ paddingLeft: 14 + (heading.level - 1) * 12 }} onClick={() => sessions.current.get(activeId)?.scrollTo(heading.pos)}><span className="outline-marker">{heading.level === 1 ? '◦' : '—'}</span><span>{heading.text || t('未命名标题')}</span></button>) : <p className="sidebar-empty">{t("写下一个标题，")}<br />{t("思路就会在这里展开。")}</p>}</nav>}
 
         </div>
       </motion.aside>}
     </AnimatePresence>
 
     <main className="main-panel">
-      {!topbarVisible && !macDesktop && <button className="restore-bar restore-top" aria-label="展开顶栏" title="展开顶栏" onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button>}
-      {!statusVisible && <button className="restore-bar restore-bottom" aria-label="展开底栏" title="展开底栏" onClick={() => setStatusVisible(true)}><ChevronUp size={17} /></button>}
+      {!topbarVisible && !macDesktop && !windowsDesktop && <button className="restore-bar restore-top" aria-label={t("展开顶栏")} title={t("展开顶栏")} onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button>}
+      {!statusVisible && <button className="restore-bar restore-bottom" aria-label={t("展开底栏")} title={t("展开底栏")} onClick={() => setStatusVisible(true)}><ChevronUp size={17} /></button>}
 
 
       <div className="editor-body"><div className="session-stack">
@@ -483,22 +495,23 @@ export default function App() {
         onChange={markdown => updateDocs(current => current.map(item => item.id === doc.id ? { ...item, markdown } : item))}
         onOutline={setHeadings} onMode={setEditorMode} onError={message => notify(message, true)} />)}
 
-      </div>{outlinePosition === 'right' && <aside className="right-outline"><div className="right-outline-title">文稿大纲 <span>{headings.length}</span></div><nav className="outline" aria-label="右侧文稿大纲">{headings.map((heading, i) => <button key={i} style={{ paddingLeft: 12 + (heading.level - 1) * 10 }} onClick={() => sessions.current.get(activeId)?.scrollTo(heading.pos)}>{heading.text || '未命名标题'}</button>)}{!headings.length && <p className="sidebar-empty">暂无标题</p>}</nav></aside>}</div>
-      <footer className="statusbar" hidden={!statusVisible}><div><button className="icon-button" disabled={!folder && (sidebarTab !== 'outline' || outlinePosition !== 'left')} aria-label={showSidebar ? '收起侧栏' : '展开侧栏'} title={`切换侧栏 · ${modKey} \\`} onClick={() => setSidebarOpen(value => !value)}>{showSidebar ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}</button><button className="mode-toggle" aria-label={editorMode === 'source' ? '切换为即时预览' : '切换为 Markdown 源码'} title={`切换编辑模式 · ${modKey} Shift M`} onClick={() => sessions.current.get(activeId)?.setMode(editorMode === 'source' ? 'preview' : 'source')}>{editorMode === 'source' ? <Code2 size={15} /> : <Eye size={15} />}<span>{editorMode === 'source' ? 'Markdown 源码' : '即时预览'}</span></button>{draftWarning && <span className="cache-warning">工作区缓存失败，请及时保存</span>}</div><div>{readOnly && <span>只读</span>}<button className="word-count-button" aria-label="字数统计设置" title="设置统计方式" onClick={() => setModal('count')}>{documentCount.toLocaleString()} {countLabels[countOptions.mode]}</button><span className="status-dot">·</span><span>UTF-8</span></div></footer>
+      </div>{outlinePosition === 'right' && <aside className="right-outline"><div className="right-outline-title">{t("文稿大纲")}<span>{headings.length}</span></div><nav className="outline" aria-label={t("右侧文稿大纲")}>{headings.map((heading, i) => <button key={i} style={{ paddingLeft: 12 + (heading.level - 1) * 10 }} onClick={() => sessions.current.get(activeId)?.scrollTo(heading.pos)}>{heading.text || t('未命名标题')}</button>)}{!headings.length && <p className="sidebar-empty">{t("暂无标题")}</p>}</nav></aside>}</div>
+      <footer className="statusbar" hidden={!statusVisible}><div><button className="icon-button" disabled={!folder && (sidebarTab !== 'outline' || outlinePosition !== 'left')} aria-label={showSidebar ? t('收起侧栏') : t('展开侧栏')} title={tf`切换侧栏 · ${modKey} \\`} onClick={() => setSidebarOpen(value => !value)}>{showSidebar ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}</button><button className="mode-toggle" aria-label={editorMode === 'source' ? t('切换为即时预览') : t('切换为 Markdown 源码')} title={tf`切换编辑模式 · ${modKey} Shift M`} onClick={() => sessions.current.get(activeId)?.setMode(editorMode === 'source' ? 'preview' : 'source')}>{editorMode === 'source' ? <Code2 size={15} /> : <Eye size={15} />}<span>{editorMode === 'source' ? t('Markdown 源码') : t('即时预览')}</span></button>{draftWarning && <span className="cache-warning">{t("工作区缓存失败，请及时保存")}</span>}</div><div>{readOnly && <span>{t("只读")}</span>}<button className="word-count-button" aria-label={t("字数统计设置")} title={t("设置统计方式")} onClick={() => setModal('count')}>{documentCount.toLocaleString()} {t(countLabels[countOptions.mode])}</button><span className="status-dot">·</span><span>UTF-8</span></div></footer>
     </main>
+    <AIAssistant open={aiOpen} onClose={() => setAiOpen(false)} selection={() => sessions.current.get(activeRef.current)?.selectionText() || ''} />
     </div>
 
-    <AnimatePresence>{toast && <motion.div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{toast.error ? <CircleHelp size={16} /> : <Check size={16} />}<span>{toast.text}</span><button aria-label="关闭提示" onClick={() => setToast(null)}><X size={14} /></button></motion.div>}</AnimatePresence>
+    <AnimatePresence>{toast && <motion.div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{toast.error ? <CircleHelp size={16} /> : <Check size={16} />}<span>{toast.text}</span><button aria-label={t("关闭提示")} onClick={() => setToast(null)}><X size={14} /></button></motion.div>}</AnimatePresence>
 
-    {modal === 'count' && <Modal title="字数统计" onClose={() => setModal(null)}><CountSettings options={countOptions} onChange={setCountOptions} markdown={active.markdown} /></Modal>}
-    {modal === 'settings' && <Modal title="设置" onClose={() => setModal(null)}><Settings writingTheme={writingTheme} setWritingTheme={chooseWritingTheme} ink={ink} setInk={setInk} dark={darkTheme} plugins={plugins} theme={theme} setTheme={setTheme} font={font} setFont={setFont} fontSize={fontSize} setFontSize={setFontSize} outline={outlinePosition} setOutline={value => { setOutlinePosition(value); setSidebarTab('files'); }} listStyle={listStyle} setListStyle={setListStyle} toolbar={toolbar} setToolbar={setToolbar} /></Modal>}
-    {(modal === 'markdown' || modal === 'latex') && <Modal title={modal === 'markdown' ? 'Markdown 语法表' : 'LaTeX 语法表'} onClose={() => setModal(null)}><ReferenceSheet type={modal} /></Modal>}
-    {modal === 'properties' && <Modal title="文稿属性" onClose={() => setModal(null)}><dl className="document-properties"><dt>名称</dt><dd>{active.name}</dd><dt>位置</dt><dd>{active.path || '本地草稿'}</dd><dt>字数</dt><dd>{countCharacters(active.markdown)}</dd><dt>源码行数</dt><dd>{active.markdown.split('\n').length}</dd><dt>编码 / 换行</dt><dd>UTF-8{active.bom ? ' BOM' : ''} / {active.lineEnding === '\r\n' ? 'CRLF' : 'LF'}</dd><dt>保存状态</dt><dd>{isDirty(active) ? '有未保存修改' : '无未保存修改'}</dd></dl></Modal>}
-    {modal === 'characters' && <Modal title="字符表" onClose={() => setModal(null)}><CharacterSheet readOnly={readOnly} onInsert={value => { if (!readOnly) { const session = sessions.current.get(activeRef.current); session?.replaceSelection(value); setModal(null); requestAnimationFrame(() => session?.focus()); } }} /></Modal>}
-    {modal === 'documents' && <Modal title="已打开的文稿" onClose={() => setModal(null)}><label className="search"><Search size={14} /><input autoFocus aria-label="快速查找文稿" placeholder="查找文稿…" value={search} onChange={event => setSearch(event.target.value)} /></label><div className="quick-documents">{docs.filter(doc => doc.name.toLowerCase().includes(search.toLowerCase())).map(doc => <button key={doc.id} onClick={() => { switchDocument(doc.id); setModal(null); }}><FileText size={16} /><span>{doc.name}</span>{isDirty(doc) && <i className="dirty-dot" aria-label="未保存" />}</button>)}</div></Modal>}
-    {modal === 'reload' && <Modal title="从磁盘重新加载？" onClose={() => setModal(null)}><p>当前文稿有未保存修改。重新加载会替换编辑内容，此操作可撤销。</p><div className="modal-actions"><button className="secondary-button" onClick={() => setModal(null)}>取消</button><button className="primary-button" onClick={() => void reload()}>重新加载</button></div></Modal>}
-    {modal === 'help' && <Modal title="让书写，顺手一点" onClose={() => setModal(null)}><p className="modal-description">使用 Markdown 语法，或选中文字唤出工具栏。</p><div className="shortcut-list">{[['新建文稿', `${modKey} N`], ['打开文稿', `${modKey} O`], ['保存', `${modKey} S`], ['另存为', `${modKey} Shift S`], ['切换侧栏', `${modKey} \\`], ['专注模式', `${modKey} Shift F`], ['加粗 / 斜体（预览）', `${modKey} B / I`], ['切换编辑模式', `${modKey} Shift M`], ['撤销', `${modKey} Z`], ['重做', `${modKey} Shift Z`]].map(([label, keys]) => <div key={label}><span>{label}</span><kbd>{keys}</kbd></div>)}</div><p className="settings-note">输入 # + 空格创建标题，&gt; + 空格创建引用。<br />未保存的修改会缓存为本地恢复草稿；请用“保存”写入文件。</p><div className="about-line"><img src="/icon.png" alt="" /><span>Chartelis <small>0.1.4 · 为专注而生</small></span></div></Modal>}
-    {modal === 'export' && <Modal title="导出文稿" onClose={() => { if (!busy) setModal(null); }}><p className="modal-description">导出当前内容，不改变 Markdown 原文件。</p><div className="export-options"><button disabled={busy} onClick={() => void exportFile('pdf')}>PDF 文档<small>A4 分页，文字可选中、可搜索</small></button><button disabled={busy} onClick={() => void exportFile('png')}>PNG 图片<small>保留当前预览样式的高清长图</small></button><button disabled={busy} onClick={() => void exportFile('docx')}>Word 文档<small>正文、表格与公式均可编辑</small></button></div>{busy && <p role="status" className="settings-note">正在生成导出文件…</p>}</Modal>}
-    {closeTarget && <Modal title="让这段灵感留下来？" onClose={() => { if (!busy) setCloseTarget(null); }}><p className="modal-description">{closeTarget === 'app' ? '还有文稿尚未保存。退出前，可以先把它们安放好。' : `“${docs.find(doc => doc.id === closeTarget)?.name}” 的修改尚未保存。`}</p><div className="modal-actions"><button className="text-button" disabled={busy} onClick={() => void finishClose(false)}>不保存</button><button className="secondary-button" disabled={busy} onClick={() => setCloseTarget(null)}>继续编辑</button><button className="primary-button" disabled={busy} onClick={() => void finishClose(true)}>{busy ? '保存中…' : closeTarget === 'app' ? '保存并退出' : '保存并关闭'}</button></div></Modal>}
+    {modal === 'count' && <Modal title={t("字数统计")} onClose={() => setModal(null)}><CountSettings options={countOptions} onChange={setCountOptions} markdown={active.markdown} /></Modal>}
+    {modal === 'settings' && <Modal title={t("设置")} onClose={() => setModal(null)}><Settings writingTheme={writingTheme} setWritingTheme={chooseWritingTheme} ink={ink} setInk={setInk} dark={darkTheme} plugins={plugins} theme={theme} setTheme={setTheme} font={font} setFont={setFont} fontSize={fontSize} setFontSize={setFontSize} outline={outlinePosition} setOutline={value => { setOutlinePosition(value); setSidebarTab('files'); }} listStyle={listStyle} setListStyle={setListStyle} toolbar={toolbar} setToolbar={setToolbar} /></Modal>}
+    {(modal === 'markdown' || modal === 'latex') && <Modal title={modal === 'markdown' ? t('Markdown 语法表') : t('LaTeX 语法表')} onClose={() => setModal(null)}><ReferenceSheet type={modal} /></Modal>}
+    {modal === 'properties' && <Modal title={t("文稿属性")} onClose={() => setModal(null)}><dl className="document-properties"><dt>{t("名称")}</dt><dd>{active.name}</dd><dt>{t("位置")}</dt><dd>{active.path || t('本地草稿')}</dd><dt>{t("字数")}</dt><dd>{countCharacters(active.markdown)}</dd><dt>{t("源码行数")}</dt><dd>{active.markdown.split('\n').length}</dd><dt>{t("编码 / 换行")}</dt><dd>UTF-8{active.bom ? ' BOM' : ''} / {active.lineEnding === '\r\n' ? 'CRLF' : 'LF'}</dd><dt>{t("保存状态")}</dt><dd>{isDirty(active) ? t('有未保存修改') : t('无未保存修改')}</dd></dl></Modal>}
+    {modal === 'characters' && <Modal title={t("字符表")} onClose={() => setModal(null)}><CharacterSheet readOnly={readOnly} onInsert={value => { if (!readOnly) { const session = sessions.current.get(activeRef.current); session?.replaceSelection(value); setModal(null); requestAnimationFrame(() => session?.focus()); } }} /></Modal>}
+    {modal === 'documents' && <Modal title={t("已打开的文稿")} onClose={() => setModal(null)}><label className="search"><Search size={14} /><input autoFocus aria-label={t("快速查找文稿")} placeholder={t("查找文稿…")} value={search} onChange={event => setSearch(event.target.value)} /></label><div className="quick-documents">{docs.filter(doc => doc.name.toLowerCase().includes(search.toLowerCase())).map(doc => <button key={doc.id} onClick={() => { switchDocument(doc.id); setModal(null); }}><FileText size={16} /><span>{doc.name}</span>{isDirty(doc) && <i className="dirty-dot" aria-label={t("未保存")} />}</button>)}</div></Modal>}
+    {modal === 'reload' && <Modal title={t("从磁盘重新加载？")} onClose={() => setModal(null)}><p>{t("当前文稿有未保存修改。重新加载会替换编辑内容，此操作可撤销。")}</p><div className="modal-actions"><button className="secondary-button" onClick={() => setModal(null)}>{t("取消")}</button><button className="primary-button" onClick={() => void reload()}>{t("重新加载")}</button></div></Modal>}
+    {modal === 'help' && <Modal title={t("让书写，顺手一点")} onClose={() => setModal(null)}><p className="modal-description">{t("使用 Markdown 语法，或选中文字唤出工具栏。")}</p><div className="shortcut-list">{[[t('新建文稿'), `${modKey} N`], [t('打开文稿'), `${modKey} O`], [t('保存'), `${modKey} S`], [t('另存为'), `${modKey} Shift S`], [t('切换侧栏'), `${modKey} \\`], [t('专注模式'), `${modKey} Shift F`], [t('加粗 / 斜体（预览）'), `${modKey} B / I`], [t('切换编辑模式'), `${modKey} Shift M`], [t('撤销'), `${modKey} Z`], [t('重做'), `${modKey} Shift Z`]].map(([label, keys]) => <div key={label}><span>{label}</span><kbd>{keys}</kbd></div>)}</div><p className="settings-note">{t("输入 # + 空格创建标题，> + 空格创建引用。")}<br />{t("未保存的修改会缓存为本地恢复草稿；请用“保存”写入文件。")}</p><div className="about-line"><img src="/icon.png" alt="" /><span>Chartelis <small>{t("为专注而生")}</small></span></div></Modal>}
+    {modal === 'export' && <Modal title={t("导出文稿")} onClose={() => { if (!busy) setModal(null); }}><p className="modal-description">{t("导出当前内容，不改变 Markdown 原文件。")}</p><div className="export-options"><button disabled={busy} onClick={() => void exportFile('pdf')}>{t("PDF 文档")}<small>{t("A4 分页，文字可选中、可搜索")}</small></button><button disabled={busy} onClick={() => void exportFile('png')}>{t("PNG 图片")}<small>{t("保留当前预览样式的高清长图")}</small></button><button disabled={busy} onClick={() => void exportFile('docx')}>{t("Word 文档")}<small>{t("正文、表格与公式均可编辑")}</small></button></div>{busy && <p role="status" className="settings-note">{t("正在生成导出文件…")}</p>}</Modal>}
+    {closeTarget && <Modal title={t("让这段灵感留下来？")} onClose={() => { if (!busy) setCloseTarget(null); }}><p className="modal-description">{closeTarget === 'app' ? t('还有文稿尚未保存。退出前，可以先把它们安放好。') : tf`“${docs.find(doc => doc.id === closeTarget)?.name}” 的修改尚未保存。`}</p><div className="modal-actions"><button className="text-button" disabled={busy} onClick={() => void finishClose(false)}>{t("不保存")}</button><button className="secondary-button" disabled={busy} onClick={() => setCloseTarget(null)}>{t("继续编辑")}</button><button className="primary-button" disabled={busy} onClick={() => void finishClose(true)}>{busy ? t('保存中…') : closeTarget === 'app' ? t('保存并退出') : t('保存并关闭')}</button></div></Modal>}
   </div>;
 }

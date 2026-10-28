@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import katex from 'katex';
 const markdown = [
   ['标题', '# 一级标题 / ## 二级标题 / ### 三级标题'], ['粗体 / 斜体', '**粗体** / *斜体*'], ['删除线 / 高亮', '~~删除线~~ / ==高亮=='],
@@ -11,5 +12,5 @@ const latex = [
   ['多行对齐', '\\begin{aligned} a &= b+c \\\\ d &= e+f \\end{aligned}'], ['括号', '\\left(\\frac{a}{b}\\right)'], ['文本', '\\text{速度} = \\frac{\\text{距离}}{\\text{时间}}'],
 ];
 export default function ReferenceSheet({ type }: { type: 'markdown' | 'latex' }) {
-  return <div className="reference-sheet"><p>{type === 'latex' ? '用 $…$ 包围行内公式，或用独占一行的 $$ 包围独立公式。点击公式修改，Esc 或 Ctrl/Cmd + Enter 返回正文。支持 KaTeX 数学语法。' : '在即时预览中输入语法，或通过右键菜单插入格式。'}</p><table><thead><tr><th>功能</th><th>语法</th>{type === 'latex' && <th>效果</th>}</tr></thead><tbody>{(type === 'latex' ? latex : markdown).map(([name, code]) => <tr key={name}><th>{name}</th><td><code>{code}</code></td>{type === 'latex' && <td dangerouslySetInnerHTML={{ __html: katex.renderToString(code, { throwOnError: false, trust: false }) }} />}</tr>)}</tbody></table></div>;
+  return <div className="reference-sheet"><p>{type === 'latex' ? t('用 $…$ 包围行内公式，或用独占一行的 $$ 包围独立公式。点击公式修改，Esc 或 Ctrl/Cmd + Enter 返回正文。支持 KaTeX 数学语法。') : t('在即时预览中输入语法，或通过右键菜单插入格式。')}</p><table><thead><tr><th>{t("功能")}</th><th>{t("语法")}</th>{type === 'latex' && <th>{t("效果")}</th>}</tr></thead><tbody>{(type === 'latex' ? latex : markdown).map(([name, code]) => <tr key={name}><th>{t(name)}</th><td><code>{t(code)}</code></td>{type === 'latex' && <td dangerouslySetInnerHTML={{ __html: katex.renderToString(t(code), { throwOnError: false, trust: false }) }} />}</tr>)}</tbody></table></div>;
 }

@@ -6,9 +6,13 @@
     "main"
   ],
   "permissions": [
+    { "identifier": "http:default", "allow": [{ "url": "https://**" }, { "url": "http://localhost:*" }, { "url": "http://127.0.0.1:*" }, { "url": "http://[::1]:*" }] },
     "core:default",
     "core:window:allow-destroy",
     "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:allow-read-text-file",
