@@ -153,13 +153,17 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (cancelled || view.isDestroyed) return;
+        // A standalone editor or a view being detached may no longer have its
+        // scrolling container by the time this animation frame runs.
+        const scroller = host.closest('.writing-scroll');
+        if (!host.isConnected || !scroller) { setBubble(null); return; }
         const { selection, doc } = view.state;
         if (!callbacks.current.active || selection.empty || !view.hasFocus() || view.composing || !(selection instanceof TextSelection)) {
           setBubble(null); return;
         }
         const start = view.coordsAtPos(selection.from);
         const end = view.coordsAtPos(selection.to);
-        const scrollRect = host.closest('.writing-scroll')!.getBoundingClientRect();
+        const scrollRect = scroller.getBoundingClientRect();
         if (start.top < scrollRect.top + 8 || start.top > scrollRect.bottom) { setBubble(null); return; }
         const marks = Object.keys(view.state.schema.marks).filter(name => doc.rangeHasMark(selection.from, selection.to, view.state.schema.marks[name]));
         const halfWidth = Math.min((callbacks.current.toolbar ?? defaultToolbar).length * 41 + 9, window.innerWidth - 24) / 2 + 8;

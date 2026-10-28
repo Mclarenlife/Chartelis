@@ -86,7 +86,11 @@ describe('document session integration', () => {
     const editor = createRef<EditorHandle>();
     await act(async () => root.render(<MarkdownEditor ref={editor} initialValue="hello world" active onChange={changed} onReady={() => {}} onOutline={() => {}} onError={failed} />));
     await settle();
+    await act(async () => editor.current!.focus());
     await act(async () => { editor.current!.setCursor({ anchor: 1, head: 6 }); editor.current!.format('highlight'); });
+    // Flush the selection toolbar frame while this standalone editor has no
+    // writing-scroll parent (the same timing exposed by the Windows CI runner).
+    await settle();
     expect(editor.current!.getMarkdown()).toContain('==hello==');
     expect(host.querySelector('mark')?.textContent).toBe('hello');
     await act(async () => editor.current!.format('table'));
