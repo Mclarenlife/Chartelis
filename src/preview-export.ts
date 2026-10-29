@@ -4,7 +4,7 @@ export function capturePreview(html: string, font: string): PreviewSnapshot {
   const session = document.querySelector<HTMLElement>('.document-session:not([hidden])');
   const style = getComputedStyle(app ?? document.documentElement);
   const variables: Record<string, string> = {};
-  for (const name of ['paper', 'sidebar', 'text', 'muted', 'subtle', 'line', 'hover', 'selected', 'accent', 'accent-soft', 'gold', 'surface', 'editor-font-size', 'writing-color', 'writing-line', 'writing-spacing']) variables[`--${name}`] = style.getPropertyValue(`--${name}`);
+  for (const name of ['paper', 'sidebar', 'text', 'muted', 'subtle', 'line', 'hover', 'selected', 'accent', 'accent-soft', 'gold', 'surface', 'editor-max-width', 'editor-font-size', 'writing-color', 'writing-line', 'writing-spacing']) variables[`--${name}`] = style.getPropertyValue(`--${name}`);
   return { html, width: session?.clientWidth || 832, font, variables };
 }
 /** The same page, Milkdown classes and tokens as the editor, without transient UI. */

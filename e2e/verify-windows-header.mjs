@@ -28,7 +28,7 @@ try {
     expect(layout.left).toBeLessThanOrEqual(layout.actions);
     expect(layout.end).toBeLessThanOrEqual(width);
     expect(layout.drag).toBeGreaterThanOrEqual(24);
-    expect(layout.height).toBe(48);
+    expect(layout.height).toBe(64);
   }
   await page.getByRole('button', { name: '最大化窗口', exact: true }).click();
   await page.getByRole('button', { name: '还原窗口', exact: true }).click();

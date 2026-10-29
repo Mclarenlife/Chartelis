@@ -12,6 +12,7 @@ import { pluginThemeId } from './plugins';
 interface Props {
   theme: string; setTheme(value: string): void; font: string; setFont(value: string): void;
   fontSize: number; setFontSize(value: number): void; outline: string; setOutline(value: string): void;
+  contentWidth: number; setContentWidth(value: number): void;
   listStyle: string; setListStyle(value: string): void; toolbar: FormatAction[]; setToolbar(value: FormatAction[]): void;
   plugins: PluginManager;
   writingTheme: string; setWritingTheme(id: string): void; ink: string; setInk(id: string): void; dark: boolean;
@@ -33,6 +34,8 @@ export default function Settings(props: Props) {
     <div className="setting-row"><span>{t("大纲位置")}</span><div className="segmented">{[['left', t('左侧栏')], ['right', t('右侧栏')]].map(([id, label]) => <button key={id} className={props.outline === id ? 'selected' : ''} onClick={() => props.setOutline(id)}>{label}</button>)}</div></div>
     <div className="setting-row"><span>{t("正文字体")}</span><div className="segmented"><button className={props.font === 'serif' ? 'selected' : ''} onClick={() => props.setFont('serif')}>{t("人文宋体")}</button><button className={props.font === 'sans' ? 'selected' : ''} onClick={() => props.setFont('sans')}>{t("简洁黑体")}</button></div></div>
     <div className="setting-row"><label htmlFor="font-size">{t("文字大小")}</label><input id="font-size" type="range" min="13" max="28" value={props.fontSize} onChange={event => props.setFontSize(Number(event.target.value))} /><span>{props.fontSize}</span></div>
+    <div className="setting-row"><label htmlFor="content-width">{t("正文最大宽度")}</label><input id="content-width" type="range" min="600" max="2000" step="20" value={props.contentWidth} onChange={event => props.setContentWidth(Number(event.target.value))} /><output htmlFor="content-width" className="content-width-value">{props.contentWidth} px</output></div>
+    <p className="settings-note">{t("随窗口宽度自适应，达到设定上限后保持居中。")}</p>
     <div className="setting-row"><span>{t("正文颜色")}</span><div className="ink-options">{inkOptions.map(item => <button key={item.id} aria-label={t(item.name)} aria-pressed={props.ink === item.id} onClick={() => props.setInk(item.id)}><i style={{ background: writingColor(item.id, props.dark) }} />{t(item.name)}</button>)}</div></div>
     <ToolbarSettings toolbar={props.toolbar} setToolbar={props.setToolbar} />
   </div>;

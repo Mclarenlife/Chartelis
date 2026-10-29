@@ -74,6 +74,10 @@ export default function App() {
   useEffect(() => { if (theme.startsWith('plugin:') && !pluginTheme) setTheme('system'); }, [theme, pluginTheme]);
   const [font, setFont] = useState(() => getPreference('chartelis.font', 'serif'));
   const [fontSize, setFontSize] = useState(() => Number(getPreference('chartelis.fontSize', '17')) || 17);
+  const [contentWidth, setContentWidth] = useState(() => {
+    const saved = Number(getPreference('chartelis.contentWidth', '960'));
+    return Number.isFinite(saved) ? Math.max(600, Math.min(2000, saved)) : 960;
+  });
   const [writingTheme, setWritingTheme] = useState(() => getPreference('chartelis.writingTheme', 'original'));
   const [ink, setInk] = useState(() => getPreference('chartelis.ink', 'auto'));
   const [countOptions, setCountOptions] = useState(() => parseCount(getPreference('chartelis.countOptions', '{}')));
@@ -169,12 +173,13 @@ export default function App() {
       localStorage.setItem('chartelis.countOptions', JSON.stringify(countOptions));
       localStorage.setItem('chartelis.font', font);
       localStorage.setItem('chartelis.fontSize', String(fontSize));
+      localStorage.setItem('chartelis.contentWidth', String(contentWidth));
       localStorage.setItem('chartelis.outline', outlinePosition);
       localStorage.setItem('chartelis.sidebar', String(sidebarOpen));
       localStorage.setItem('chartelis.topbar', String(topbarVisible));
       localStorage.setItem('chartelis.statusbar', String(statusVisible));
     } catch { /* Editing works without preference storage. */ }
-  }, [writingTheme, ink, countOptions, theme, font, fontSize, outlinePosition, sidebarOpen, listStyle, toolbar, recent, topbarVisible, statusVisible]);
+  }, [writingTheme, ink, countOptions, theme, font, fontSize, contentWidth, outlinePosition, sidebarOpen, listStyle, toolbar, recent, topbarVisible, statusVisible]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), toast.error ? 9000 : 4500);
@@ -448,7 +453,7 @@ export default function App() {
     };
   }, [notify]);
 
-  return <div className={`app ${macDesktop ? 'mac-desktop' : windowsDesktop ? 'windows-desktop' : ''} ${focusMode ? 'focus-mode' : ''}`} style={{ '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
+  return <div className={`app ${macDesktop ? 'mac-desktop' : windowsDesktop ? 'windows-desktop' : ''} ${focusMode ? 'focus-mode' : ''}`} style={{ '--topbar-inset': topbarVisible || macDesktop ? 'var(--header-height)' : windowsDesktop ? '32px' : '0px', '--editor-max-width': `${contentWidth}px`, '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
       {chooseLanguage && <LanguageWelcome onDone={() => setChooseLanguage(false)} />}
       {(macDesktop || windowsDesktop) && !topbarVisible && <div className="window-strip" data-tauri-drag-region><button className="icon-button" aria-label={t("展开顶栏")} title={t("展开顶栏")} onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button><div className="window-drag-area" data-tauri-drag-region />{windowsDesktop && <WindowControls onError={notify} />}</div>}
       <header className="topbar" hidden={!topbarVisible} data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined}>
@@ -504,7 +509,7 @@ export default function App() {
     <AnimatePresence>{toast && <motion.div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{toast.error ? <CircleHelp size={16} /> : <Check size={16} />}<span>{toast.text}</span><button aria-label={t("关闭提示")} onClick={() => setToast(null)}><X size={14} /></button></motion.div>}</AnimatePresence>
 
     {modal === 'count' && <Modal title={t("字数统计")} onClose={() => setModal(null)}><CountSettings options={countOptions} onChange={setCountOptions} markdown={active.markdown} /></Modal>}
-    {modal === 'settings' && <Modal title={t("设置")} onClose={() => setModal(null)}><Settings writingTheme={writingTheme} setWritingTheme={chooseWritingTheme} ink={ink} setInk={setInk} dark={darkTheme} plugins={plugins} theme={theme} setTheme={setTheme} font={font} setFont={setFont} fontSize={fontSize} setFontSize={setFontSize} outline={outlinePosition} setOutline={value => { setOutlinePosition(value); setSidebarTab('files'); }} listStyle={listStyle} setListStyle={setListStyle} toolbar={toolbar} setToolbar={setToolbar} /></Modal>}
+    {modal === 'settings' && <Modal title={t("设置")} onClose={() => setModal(null)}><Settings writingTheme={writingTheme} setWritingTheme={chooseWritingTheme} ink={ink} setInk={setInk} dark={darkTheme} plugins={plugins} theme={theme} setTheme={setTheme} font={font} setFont={setFont} fontSize={fontSize} setFontSize={setFontSize} contentWidth={contentWidth} setContentWidth={setContentWidth} outline={outlinePosition} setOutline={value => { setOutlinePosition(value); setSidebarTab('files'); }} listStyle={listStyle} setListStyle={setListStyle} toolbar={toolbar} setToolbar={setToolbar} /></Modal>}
     {(modal === 'markdown' || modal === 'latex') && <Modal title={modal === 'markdown' ? t('Markdown 语法表') : t('LaTeX 语法表')} onClose={() => setModal(null)}><ReferenceSheet type={modal} /></Modal>}
     {modal === 'properties' && <Modal title={t("文稿属性")} onClose={() => setModal(null)}><dl className="document-properties"><dt>{t("名称")}</dt><dd>{active.name}</dd><dt>{t("位置")}</dt><dd>{active.path || t('本地草稿')}</dd><dt>{t("字数")}</dt><dd>{countCharacters(active.markdown)}</dd><dt>{t("源码行数")}</dt><dd>{active.markdown.split('\n').length}</dd><dt>{t("编码 / 换行")}</dt><dd>UTF-8{active.bom ? ' BOM' : ''} / {active.lineEnding === '\r\n' ? 'CRLF' : 'LF'}</dd><dt>{t("保存状态")}</dt><dd>{isDirty(active) ? t('有未保存修改') : t('无未保存修改')}</dd></dl></Modal>}
     {modal === 'characters' && <Modal title={t("字符表")} onClose={() => setModal(null)}><CharacterSheet readOnly={readOnly} onInsert={value => { if (!readOnly) { const session = sessions.current.get(activeRef.current); session?.replaceSelection(value); setModal(null); requestAnimationFrame(() => session?.focus()); } }} /></Modal>}

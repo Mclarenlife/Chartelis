@@ -14,7 +14,7 @@ try {
       const actions = header.querySelector('.topbar-actions').getBoundingClientRect();
       return { height: header.getBoundingClientRect().height, brandLeft: brand.left, leftEnd: left.right, actionsStart: actions.left, actionsEnd: actions.right };
     });
-    expect(boxes.height).toBe(48); expect(boxes.brandLeft).toBeGreaterThanOrEqual(90);
+    expect(boxes.height).toBe(64); expect(boxes.brandLeft).toBeGreaterThanOrEqual(90);
     expect(boxes.leftEnd).toBeLessThanOrEqual(boxes.actionsStart);
     expect(boxes.actionsEnd).toBeLessThanOrEqual(width);
     await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -24,7 +24,7 @@ try {
   await page.screenshot({ path: 'artifacts/mac-header-720.png' });
   await page.getByRole('button', { name: '收起顶栏', exact: true }).click();
   await expect(page.locator('.topbar')).toBeHidden();
-  await expect(page.locator('.window-strip')).toHaveCSS('height', '48px');
+  await expect(page.locator('.window-strip')).toHaveCSS('height', '64px');
   await page.reload();
   await expect(page.locator('.window-strip')).toBeVisible();
   await page.getByRole('button', { name: '展开顶栏', exact: true }).click();

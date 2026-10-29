@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Chartelis",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identifier": "com.chartelis.editor",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -16,7 +16,7 @@
         "title": "Chartelis",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 14, "y": 20 },
+        "trafficLightPosition": { "x": 14, "y": 28 },
         "width": 1280,
         "height": 880,
         "minWidth": 720,

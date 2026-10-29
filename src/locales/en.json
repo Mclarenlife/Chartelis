@@ -544,6 +544,8 @@
   "人文宋体": "Serif",
   "简洁黑体": "Sans serif",
   "文字大小": "Text size",
+  "正文最大宽度": "Maximum text width",
+  "随窗口宽度自适应，达到设定上限后保持居中。": "Adapts to the window width and stays centered at the selected maximum.",
   "正文颜色": "Text color",
   "Markdown 源码编辑器": "Markdown source editor",
   "黄色": "Yellow",

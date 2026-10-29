@@ -164,10 +164,12 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
         const start = view.coordsAtPos(selection.from);
         const end = view.coordsAtPos(selection.to);
         const scrollRect = scroller.getBoundingClientRect();
-        if (start.top < scrollRect.top + 8 || start.top > scrollRect.bottom) { setBubble(null); return; }
+        const headerBottom = document.querySelector('.topbar:not([hidden]), .window-strip')?.getBoundingClientRect().bottom ?? 0;
+        const visibleTop = Math.max(scrollRect.top, headerBottom);
+        if (start.top < visibleTop + 8 || start.top > scrollRect.bottom) { setBubble(null); return; }
         const marks = Object.keys(view.state.schema.marks).filter(name => doc.rangeHasMark(selection.from, selection.to, view.state.schema.marks[name]));
         const halfWidth = Math.min((callbacks.current.toolbar ?? defaultToolbar).length * 41 + 9, window.innerWidth - 24) / 2 + 8;
-        setBubble({ x: Math.max(halfWidth, Math.min(window.innerWidth - halfWidth, (start.left + end.right) / 2)), y: Math.max(scrollRect.top + 8, start.top - 54), marks });
+        setBubble({ x: Math.max(halfWidth, Math.min(window.innerWidth - halfWidth, (start.left + end.right) / 2)), y: Math.max(visibleTop + 8, start.top - 54), marks });
       });
     };
     const updateOutline = (view: EditorView) => {
