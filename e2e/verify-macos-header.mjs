@@ -31,5 +31,11 @@ try {
   await page.getByRole('button', { name: '展开顶栏', exact: true }).click();
   await expect(page.locator('.topbar')).toBeVisible();
   expect(await page.locator('button[data-tauri-drag-region]').count()).toBe(0);
+  await page.getByRole('button', { name: '视图', exact: true }).click();
+  await page.getByRole('menuitem', { name: '大纲', exact: true }).click();
+  await expect(page.locator('.sidebar')).toHaveCSS('max-width', '220px');
+  await expect.poll(async () => (await page.locator('.topbar').boundingBox()).x).toBe(220);
+  const fit = await page.locator('.topbar').evaluate(el => el.querySelector('.topbar-left').getBoundingClientRect().right <= el.querySelector('.topbar-actions').getBoundingClientRect().left);
+  expect(fit).toBe(true);
   console.log('PASS: Mac traffic-light space, compact responsive header, clickable settings, collapse/restore persistence; native AppKit interaction requires a Mac.');
 } finally { await browser.close(); }

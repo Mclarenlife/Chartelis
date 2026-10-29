@@ -1,4 +1,6 @@
 import { t, tf, useLanguage } from './i18n';
+import { createPortal } from 'react-dom';
+import { scrollOutlineTarget } from './outline-scroll';
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, serializerCtx, parserCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core';
 import { commonmark, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand, turnIntoTextCommand, createCodeBlockCommand, insertHrCommand } from '@milkdown/kit/preset/commonmark';
@@ -139,8 +141,13 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
     focus: () => instance.current?.action(ctx => ctx.get(editorViewCtx).focus()),
     scrollTo: pos => instance.current?.action(ctx => {
       const view = ctx.get(editorViewCtx);
-      view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(pos))).scrollIntoView());
+      const target = Math.max(0, Math.min(pos, view.state.doc.content.size));
+      view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(target))));
       view.focus();
+      scrollOutlineTarget(view.dom, () => {
+        const node = view.nodeDOM(target);
+        return node instanceof HTMLElement ? node.getBoundingClientRect().top : view.coordsAtPos(target).top;
+      });
     }),
   }), []);
 
@@ -253,11 +260,11 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
   return <>
     <div className={`editor-mount ${ready ? 'is-ready' : ''}`} ref={mount} />
     {!ready && <div className="editor-loading">{t("正在铺开稿纸…")}</div>}
-    <AnimatePresence>
+    {createPortal(<AnimatePresence>
       {bubble && props.active && !props.readOnly && actions.length > 0 && <motion.div className="floating-toolbar" style={{ left: bubble.x, top: bubble.y, x: '-50%' }} initial={{ opacity: 0, y: 5, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 3, scale: .98 }} transition={{ duration: .16 }}>
         <FormatToolbar actions={actions} marks={bubble.marks} onSelect={action => props.onFormat?.(action)} />
       </motion.div>}
-    </AnimatePresence>
+    </AnimatePresence>, document.body)}
   </>;
 });
 

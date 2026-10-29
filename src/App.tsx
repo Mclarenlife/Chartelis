@@ -16,7 +16,7 @@ import { writingThemes, writingColor, parseCount, countText, countLabels } from 
 import ReferenceSheet from './ReferenceSheet';
 import CharacterSheet from './CharacterSheet';
 import { chooseWorkspaceFolder, readWorkspaceFolder, openWorkspaceFile, type FolderView, type FolderLocation, type WorkspaceFile } from './folders';
-import { readToolbar, documentExcerpt } from './preferences';
+import { readToolbar, documentExcerpt, readHighlightColor } from './preferences';
 import { useTheme } from './useTheme';
 import { usePlugins } from './usePlugins';
 import { pluginThemeId, renderTemplate, runSelectionCommand, type PluginCommand, type PluginTemplate } from './plugins';
@@ -72,6 +72,7 @@ export default function App() {
   const pluginTheme = enabledPlugins.flatMap(plugin => plugin.themes.map(item => ({ key: pluginThemeId(plugin.id, item.id), theme: item }))).find(item => item.key === theme)?.theme;
   const { dark: darkTheme } = useTheme(theme, pluginTheme);
   useEffect(() => { if (theme.startsWith('plugin:') && !pluginTheme) setTheme('system'); }, [theme, pluginTheme]);
+  const [highlightColor, setHighlightColor] = useState(readHighlightColor);
   const [font, setFont] = useState(() => getPreference('chartelis.font', 'serif'));
   const [fontSize, setFontSize] = useState(() => Number(getPreference('chartelis.fontSize', '17')) || 17);
   const [contentWidth, setContentWidth] = useState(() => {
@@ -173,6 +174,7 @@ export default function App() {
       localStorage.setItem('chartelis.ink', ink);
       localStorage.setItem('chartelis.countOptions', JSON.stringify(countOptions));
       localStorage.setItem('chartelis.font', font);
+      localStorage.setItem('chartelis.highlightColor', highlightColor);
       localStorage.setItem('chartelis.fontSize', String(fontSize));
       localStorage.setItem('chartelis.contentWidth', String(contentWidth));
       localStorage.setItem('chartelis.outline', outlinePosition);
@@ -180,7 +182,7 @@ export default function App() {
       localStorage.setItem('chartelis.topbar', String(topbarVisible));
       localStorage.setItem('chartelis.statusbar', String(statusVisible));
     } catch { /* Editing works without preference storage. */ }
-  }, [writingTheme, ink, countOptions, theme, font, fontSize, contentWidth, outlinePosition, sidebarOpen, listStyle, toolbar, recent, topbarVisible, statusVisible]);
+  }, [highlightColor, writingTheme, ink, countOptions, theme, font, fontSize, contentWidth, outlinePosition, sidebarOpen, listStyle, toolbar, recent, topbarVisible, statusVisible]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), toast.error ? 9000 : 4500);
@@ -454,15 +456,8 @@ export default function App() {
     };
   }, [notify]);
 
-  return <div className={`app ${macDesktop ? 'mac-desktop' : windowsDesktop ? 'windows-desktop' : ''} ${focusMode ? 'focus-mode' : ''}`} style={{ '--topbar-inset': topbarVisible || macDesktop ? 'var(--header-height)' : windowsDesktop ? '32px' : '0px', '--editor-max-width': `${contentWidth}px`, '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
+  return <div className={`app ${macDesktop ? 'mac-desktop' : windowsDesktop ? 'windows-desktop' : ''} ${showSidebar ? 'has-sidebar' : ''} ${focusMode ? 'focus-mode' : ''}`} style={{ '--highlight-color': highlightColor + '80', '--bottom-bar-inset': statusVisible ? '39px' : '0px', '--topbar-inset': topbarVisible || macDesktop ? 'var(--header-height)' : windowsDesktop ? '32px' : '0px', '--editor-max-width': `${contentWidth}px`, '--editor-font-size': `${fontSize}px`, '--writing-color': writingColor(ink, darkTheme), '--writing-line': typography.line, '--writing-spacing': typography.spacing } as React.CSSProperties}>
       {chooseLanguage && <LanguageWelcome onDone={() => setChooseLanguage(false)} />}
-      {(macDesktop || windowsDesktop) && !topbarVisible && <div className="window-strip" data-tauri-drag-region><div className="window-drag-area" data-tauri-drag-region /><button className="icon-button" aria-label={t("展开顶栏")} title={t("展开顶栏")} onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button>{windowsDesktop && <WindowControls onError={notify} />}</div>}
-      <header className="topbar" hidden={!topbarVisible} data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined}>
-        <div className="topbar-left" data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined}><button className="icon-button header-settings" aria-label={t("设置")} title={t("设置")} onClick={() => setModal('settings')}><Settings2 size={16} /></button>
-          <AppMenu groups={menus} />
-<button className="icon-button" aria-label={t("撤销")} title={tf`撤销 · ${modKey} Z`} disabled={readOnly || !historyState.undo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.undo()}><Undo2 size={18} /></button><button className="icon-button" aria-label={t("重做")} title={tf`重做 · ${modKey} Shift Z`} disabled={readOnly || !historyState.redo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.redo()}><Redo2 size={18} /></button></div>
-        <div className="window-drag-area" data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined} /><div className="topbar-actions"><button className={`icon-button ${aiOpen ? 'is-active' : ''}`} aria-label={t('AI 助手')} title={t('AI 助手')} aria-expanded={aiOpen} aria-controls="ai-assistant" onClick={() => setAiOpen(value => !value)}><Sparkles size={18} /></button><span className="save-state">{busy ? t('处理中…') : isDirty(active) ? t('尚未保存') : active.path || active.handle ? t('已保存') : t('本地草稿')}</span><button className="save-button" onClick={() => void saveFile()} disabled={busy} title={tf`保存 · ${modKey} S`}><Save size={15} /><span>{t("保存")}</span></button><button className="icon-button" aria-label={t("导出文稿")} title={t("导出 PDF、图片、Word")} onClick={() => setModal('export')} disabled={busy}><Download size={17} /></button><span className="topbar-separator" /><button className={`icon-button ${focusMode ? 'is-active' : ''}`} aria-label={focusMode ? t('退出专注模式') : t('专注模式')} title={tf`专注模式 · ${modKey} Shift F`} onClick={() => setFocusMode(value => !value)}><ScanLine size={18} /></button><button className="icon-button" aria-label={darkTheme ? t('切换浅色主题') : t('切换深色主题')} onClick={() => setTheme(darkTheme ? 'light' : 'dark')}>{darkTheme ? <Sun size={18} /> : <Moon size={17} />}</button><button className="icon-button" aria-label={t("收起顶栏")} title={t("收起顶栏")} onClick={() => setTopbarVisible(false)}><ChevronUp size={17} /></button>{windowsDesktop && topbarVisible && <WindowControls onError={notify} />}</div>
-      </header>
     <div className="workspace-layout">
     <AnimatePresence initial={false}>
       {showSidebar && <motion.aside className="sidebar" initial={{ width: 0, opacity: 0 }} animate={{ width: 254, opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 34 }}>
@@ -484,13 +479,21 @@ export default function App() {
               </div>)}
               {!docs.some(doc => doc.name.toLowerCase().includes(search.toLowerCase())) && <p className="sidebar-empty">{t("没有找到这篇文稿")}</p>}
             </div>
-          </> : <nav className="outline" aria-label={t("文稿大纲")}>{headings.length ? headings.map((heading, i) => <button key={`${heading.pos}-${i}`} style={{ paddingLeft: 14 + (heading.level - 1) * 12 }} onClick={() => sessions.current.get(activeId)?.scrollTo(heading.pos)}><span className="outline-marker">{heading.level === 1 ? '◦' : '—'}</span><span>{heading.text || t('未命名标题')}</span></button>) : <p className="sidebar-empty">{t("写下一个标题，")}<br />{t("思路就会在这里展开。")}</p>}</nav>}
+          </> : <nav className="outline" aria-label={t("文稿大纲")}>{headings.length ? headings.map((heading, i) => <button key={`${heading.pos}-${i}`} style={{ paddingLeft: 14 + (heading.level - 1) * 12 }} onClick={() => sessions.current.get(activeId)?.scrollTo(heading.pos)}><span className="outline-marker" aria-hidden="true">{heading.level === 1 ? '◦' : '—'}</span><span>{heading.text || t('未命名标题')}</span></button>) : <p className="sidebar-empty">{t("写下一个标题，")}<br />{t("思路就会在这里展开。")}</p>}</nav>}
 
         </div>
       </motion.aside>}
     </AnimatePresence>
 
     <main className="main-panel">
+      {(macDesktop || windowsDesktop) && !topbarVisible && <div className="window-strip" data-tauri-drag-region><div className="window-drag-area" data-tauri-drag-region /><button className="icon-button" aria-label={t("展开顶栏")} title={t("展开顶栏")} onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button>{windowsDesktop && <WindowControls onError={notify} />}</div>}
+      <header className="topbar" hidden={!topbarVisible} data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined}>
+        <div className="topbar-left" data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined}><button className="icon-button header-settings" aria-label={t("设置")} title={t("设置")} onClick={() => setModal('settings')}><Settings2 size={16} /></button>
+          <AppMenu groups={menus} />
+<button className="icon-button" aria-label={t("撤销")} title={tf`撤销 · ${modKey} Z`} disabled={readOnly || !historyState.undo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.undo()}><Undo2 size={18} /></button><button className="icon-button" aria-label={t("重做")} title={tf`重做 · ${modKey} Shift Z`} disabled={readOnly || !historyState.redo} onMouseDown={event => event.preventDefault()} onClick={() => sessions.current.get(activeId)?.redo()}><Redo2 size={18} /></button></div>
+        <div className="window-drag-area" data-tauri-drag-region={macDesktop || windowsDesktop ? true : undefined} /><div className="topbar-actions"><button className={`icon-button ${aiOpen ? 'is-active' : ''}`} aria-label={t('AI 助手')} title={t('AI 助手')} aria-expanded={aiOpen} aria-controls="ai-assistant" onClick={() => setAiOpen(value => !value)}><Sparkles size={18} /></button><span className="save-state">{busy ? t('处理中…') : isDirty(active) ? t('尚未保存') : active.path || active.handle ? t('已保存') : t('本地草稿')}</span><button className="save-button" onClick={() => void saveFile()} disabled={busy} title={tf`保存 · ${modKey} S`}><Save size={15} /><span>{t("保存")}</span></button><button className="icon-button" aria-label={t("导出文稿")} title={t("导出 PDF、图片、Word")} onClick={() => setModal('export')} disabled={busy}><Download size={17} /></button><span className="topbar-separator" /><button className={`icon-button ${focusMode ? 'is-active' : ''}`} aria-label={focusMode ? t('退出专注模式') : t('专注模式')} title={tf`专注模式 · ${modKey} Shift F`} onClick={() => setFocusMode(value => !value)}><ScanLine size={18} /></button><button className="icon-button" aria-label={darkTheme ? t('切换浅色主题') : t('切换深色主题')} onClick={() => setTheme(darkTheme ? 'light' : 'dark')}>{darkTheme ? <Sun size={18} /> : <Moon size={17} />}</button><button className="icon-button" aria-label={t("收起顶栏")} title={t("收起顶栏")} onClick={() => setTopbarVisible(false)}><ChevronUp size={17} /></button>{windowsDesktop && topbarVisible && <WindowControls onError={notify} />}</div>
+      </header>
+
       {!topbarVisible && !macDesktop && !windowsDesktop && <button className="restore-bar restore-top" aria-label={t("展开顶栏")} title={t("展开顶栏")} onClick={() => setTopbarVisible(true)}><ChevronDown size={17} /></button>}
       {!statusVisible && <button className="restore-bar restore-bottom" aria-label={t("展开底栏")} title={t("展开底栏")} onClick={() => setStatusVisible(true)}><ChevronUp size={17} /></button>}
 
@@ -510,7 +513,7 @@ export default function App() {
     <AnimatePresence>{toast && <motion.div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{toast.error ? <CircleHelp size={16} /> : <Check size={16} />}<span>{toast.text}</span><button aria-label={t("关闭提示")} onClick={() => setToast(null)}><X size={14} /></button></motion.div>}</AnimatePresence>
 
     {modal === 'count' && <Modal title={t("字数统计")} onClose={() => setModal(null)}><CountSettings options={countOptions} onChange={setCountOptions} markdown={active.markdown} /></Modal>}
-    {modal === 'settings' && <Modal title={t("设置")} onClose={() => setModal(null)}><Settings writingTheme={writingTheme} setWritingTheme={chooseWritingTheme} ink={ink} setInk={setInk} dark={darkTheme} plugins={plugins} theme={theme} setTheme={setTheme} font={font} setFont={setFont} fontSize={fontSize} setFontSize={setFontSize} contentWidth={contentWidth} setContentWidth={setContentWidth} outline={outlinePosition} setOutline={value => { setOutlinePosition(value); setSidebarTab('files'); }} listStyle={listStyle} setListStyle={setListStyle} toolbar={toolbar} setToolbar={setToolbar} /></Modal>}
+    {modal === 'settings' && <Modal title={t("设置")} onClose={() => setModal(null)}><Settings highlightColor={highlightColor} setHighlightColor={setHighlightColor} writingTheme={writingTheme} setWritingTheme={chooseWritingTheme} ink={ink} setInk={setInk} dark={darkTheme} plugins={plugins} theme={theme} setTheme={setTheme} font={font} setFont={setFont} fontSize={fontSize} setFontSize={setFontSize} contentWidth={contentWidth} setContentWidth={setContentWidth} outline={outlinePosition} setOutline={value => { setOutlinePosition(value); setSidebarTab('files'); }} listStyle={listStyle} setListStyle={setListStyle} toolbar={toolbar} setToolbar={setToolbar} /></Modal>}
     {(modal === 'markdown' || modal === 'latex') && <Modal title={modal === 'markdown' ? t('Markdown 语法表') : t('LaTeX 语法表')} onClose={() => setModal(null)}><ReferenceSheet type={modal} /></Modal>}
     {modal === 'properties' && <Modal title={t("文稿属性")} onClose={() => setModal(null)}><dl className="document-properties"><dt>{t("名称")}</dt><dd>{active.name}</dd><dt>{t("位置")}</dt><dd>{active.path || t('本地草稿')}</dd><dt>{t("字数")}</dt><dd>{countCharacters(active.markdown)}</dd><dt>{t("源码行数")}</dt><dd>{active.markdown.split('\n').length}</dd><dt>{t("编码 / 换行")}</dt><dd>UTF-8{active.bom ? ' BOM' : ''} / {active.lineEnding === '\r\n' ? 'CRLF' : 'LF'}</dd><dt>{t("保存状态")}</dt><dd>{isDirty(active) ? t('有未保存修改') : t('无未保存修改')}</dd></dl></Modal>}
     {modal === 'characters' && <Modal title={t("字符表")} onClose={() => setModal(null)}><CharacterSheet readOnly={readOnly} onInsert={value => { if (!readOnly) { const session = sessions.current.get(activeRef.current); session?.replaceSelection(value); setModal(null); requestAnimationFrame(() => session?.focus()); } }} /></Modal>}

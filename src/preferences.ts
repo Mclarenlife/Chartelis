@@ -1,5 +1,13 @@
 import type { FormatAction } from './formatting';
 
+export const defaultHighlightColor = '#e8dba4';
+export function readHighlightColor() {
+  try {
+    const color = localStorage.getItem('chartelis.highlightColor') ?? '';
+    return /^#[\da-f]{6}$/i.test(color) ? color.toLowerCase() : defaultHighlightColor;
+  } catch { return defaultHighlightColor; }
+}
+
 export const themes = [
   { id: 'warm', name: '晨光', colors: ['#faf9f6', '#868765', '#b09b77'] },
   { id: 'sage', name: '苔绿', colors: ['#f4f7f2', '#50745c', '#94a687'] },

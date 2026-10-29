@@ -1,4 +1,5 @@
 import { t, useLanguage } from './i18n';
+import { scrollOutlineTarget } from './outline-scroll';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { findText, type SearchEditor } from './search';
 import { StateEffect, StateField, EditorState, Compartment } from '@codemirror/state';
@@ -92,8 +93,10 @@ const SourceEditor = forwardRef<SourceHandle, Props>(function SourceEditor(props
     scrollTo(pos) {
       const view = instance.current;
       if (!view) return;
-      view.dispatch({ selection: { anchor: Math.min(pos, view.state.doc.length) }, scrollIntoView: true });
-      view.focus();
+      const anchor = Math.max(0, Math.min(pos, view.state.doc.length));
+      view.dispatch({ selection: { anchor } });
+      view.contentDOM.focus({ preventScroll: true });
+      scrollOutlineTarget(view.dom, () => view.documentTop + view.lineBlockAt(anchor).top);
     },
   }), []);
   useEffect(() => {

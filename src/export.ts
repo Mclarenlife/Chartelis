@@ -1,4 +1,5 @@
 import { t, tf } from './i18n';
+import { readHighlightColor } from './preferences';
 import { unified } from 'unified';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -21,7 +22,9 @@ export async function markdownHtml(markdown: string) {
   return String(await unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkLatexDelimiters).use(resolveLatexDelimiters).use(remarkHighlight).use(remarkTextColor).use(remarkRehype).use(rehypeKatex, { throwOnError: false, trust: false }).use(rehypeStringify).process(markdown));
 }
 
-export async function wordBlob(markdown: string, title: string) {
+export async function wordBlob(markdown: string, title: string, highlightColor = readHighlightColor()) {
+  // Word run shading supports arbitrary colors; blend onto its white page as in preview.
+  const highlightFill = (highlightColor.match(/[a-f\d]{2}/gi) ?? ['e8', 'db', 'a4']).map(channel => Math.round((parseInt(channel, 16) + 255) / 2).toString(16).padStart(2, '0')).join('');
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ExternalHyperlink, HeadingLevel, WidthType, LevelFormat, AlignmentType } = await import('docx');
   const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkLatexDelimiters).use(resolveLatexDelimiters).use(remarkHighlight).use(remarkTextColor);
   const tree: any = processor.runSync(processor.parse(markdown));
@@ -33,7 +36,7 @@ export async function wordBlob(markdown: string, title: string) {
     if (node.type === 'inlineCode') return [new TextRun({ text: node.value, font: 'Consolas', shading: { fill: 'F0EFEB' }, ...style })];
     if (node.type === 'image') return [new ExternalHyperlink({ link: node.url, children: [new TextRun({ text: tf`[图片：${node.alt || node.url}]`, style: 'Hyperlink' })] })];
     if (node.type === 'link') return [new ExternalHyperlink({ link: node.url, children: node.children.flatMap((child: any) => inline(child, { ...style, style: 'Hyperlink' })) })];
-    const next = { ...style, ...(node.type === 'textColor' ? { color: node.color.slice(1) } : {}), ...(node.type === 'strong' ? { bold: true } : node.type === 'emphasis' ? { italics: true } : node.type === 'delete' ? { strike: true } : node.type === 'highlight' ? { highlight: 'yellow' } : {}) };
+    const next = { ...style, ...(node.type === 'textColor' ? { color: node.color.slice(1) } : {}), ...(node.type === 'strong' ? { bold: true } : node.type === 'emphasis' ? { italics: true } : node.type === 'delete' ? { strike: true } : node.type === 'highlight' ? { shading: { fill: highlightFill } } : {}) };
     return (node.children || []).flatMap((child: any) => inline(child, next));
   }
   function blocks(nodes: any[], level = 0): any[] {

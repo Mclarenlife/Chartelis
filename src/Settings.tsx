@@ -2,6 +2,7 @@ import { t } from './i18n';
 import { writingThemes, inkOptions, writingColor } from './writing-preferences';
 import { themes } from './preferences';
 import LanguageSettings from './LanguageSettings';
+import HighlightSettings from './HighlightSettings';
 import MathCompatibilitySetting from './MathCompatibilitySetting';
 import ToolbarSettings from './ToolbarSettings';
 import type { FormatAction } from './formatting';
@@ -13,6 +14,7 @@ interface Props {
   theme: string; setTheme(value: string): void; font: string; setFont(value: string): void;
   fontSize: number; setFontSize(value: number): void; outline: string; setOutline(value: string): void;
   contentWidth: number; setContentWidth(value: number): void;
+  highlightColor: string; setHighlightColor(value: string): void;
   listStyle: string; setListStyle(value: string): void; toolbar: FormatAction[]; setToolbar(value: FormatAction[]): void;
   plugins: PluginManager;
   writingTheme: string; setWritingTheme(id: string): void; ink: string; setInk(id: string): void; dark: boolean;
@@ -37,6 +39,7 @@ export default function Settings(props: Props) {
     <div className="setting-row"><label htmlFor="content-width">{t("正文最大宽度")}</label><input id="content-width" type="range" min="600" max="2000" step="20" value={props.contentWidth} onChange={event => props.setContentWidth(Number(event.target.value))} /><output htmlFor="content-width" className="content-width-value">{props.contentWidth} px</output></div>
     <p className="settings-note">{t("随窗口宽度自适应，达到设定上限后保持居中。")}</p>
     <div className="setting-row"><span>{t("正文颜色")}</span><div className="ink-options">{inkOptions.map(item => <button key={item.id} aria-label={t(item.name)} aria-pressed={props.ink === item.id} onClick={() => props.setInk(item.id)}><i style={{ background: writingColor(item.id, props.dark) }} />{t(item.name)}</button>)}</div></div>
+    <HighlightSettings color={props.highlightColor} onChange={props.setHighlightColor} />
     <ToolbarSettings toolbar={props.toolbar} setToolbar={props.setToolbar} />
   </div>;
 }

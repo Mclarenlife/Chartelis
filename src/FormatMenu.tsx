@@ -1,4 +1,5 @@
 import { t, tf } from './i18n';
+import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { formatGroups, linkMarkdown, type FormatAction, type FormatValue } from './formatting';
 import { FormatIcon } from './FormatToolbar';
@@ -38,7 +39,7 @@ export default function FormatMenu({ x, y, onSelect, onColor, onClose }: { x: nu
     document.addEventListener('pointerdown', dismiss); document.addEventListener('scroll', scroll, true); window.addEventListener('resize', onClose);
     return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('scroll', scroll, true); window.removeEventListener('resize', onClose); };
   }, [onClose]);
-  return <div ref={menu} className="format-menu" role="menu" aria-label={t("Markdown 格式")} style={position} onContextMenu={event => event.preventDefault()} onKeyDown={event => {
+  return createPortal(<div ref={menu} className="format-menu" role="menu" aria-label={t("Markdown 格式")} style={position} onContextMenu={event => event.preventDefault()} onKeyDown={event => {
     if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
     if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
       event.preventDefault(); const buttons = [...menu.current!.querySelectorAll('button')];
@@ -61,5 +62,5 @@ export default function FormatMenu({ x, y, onSelect, onColor, onClose }: { x: nu
       <input ref={picker} type="color" className="native-color-picker" aria-label={t("自定义文字颜色")} value={custom ?? last} onChange={event => setCustom(event.target.value)} />
     </div>{custom && <div className="custom-color-confirm"><i style={{ background: custom }} /><span>{custom.toUpperCase()}</span><button onClick={() => applyColor(custom)}>{t("应用颜色")}</button></div>}</div>
     {formatGroups.map(group => <div className="format-group" key={group.label} role="group" aria-label={t(group.label)}><span aria-hidden="true">{t(group.label)}</span><div>{group.items.map(([action, label]) => <button key={action} role="menuitem" tabIndex={-1} aria-label={t(label)} title={t(label)} onMouseDown={event => event.preventDefault()} onClick={() => onSelect(action)}><FormatIcon action={action} /></button>)}</div></div>)}
-  </div>;
+  </div>, document.body);
 }

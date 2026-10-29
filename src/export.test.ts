@@ -6,6 +6,13 @@ import { DOMParser } from '@xmldom/xmldom';
 import { paginate } from './pdf-export';
 
 const sample = '# 中文标题\n\n这是 **粗体**、~~删除~~和 ==高亮==。\n\n| 列一 | 列二 |\n| --- | --- |\n| 可编辑 | 中文内容 |\n\n```ts\nconst a = 1\n```';
+it('exports custom highlight colors as editable Word run shading', async () => {
+  const blob = await wordBlob('==自定义高亮==', '高亮', '#a6c9ee');
+  const xml = strFromU8(unzipSync(new Uint8Array(await blob.arrayBuffer()))['word/document.xml']);
+  expect(xml).toContain('w:fill="d3e4f7"');
+  expect(xml).toContain('自定义高亮');
+  expect(xml).not.toContain('==');
+});
 it('exports inline and display equations as native editable Office Math', async () => {
   const math = 'Inline $x^2$\n\n$$\n\\frac{a}{b}\n$$';
   const html = await markdownHtml(math);
@@ -58,7 +65,7 @@ it('exports editable OOXML text, styles and tables instead of a screenshot', asy
   expect(xml).toContain('中文标题');
   expect(xml).toContain('可编辑');
   expect(xml).toContain('<w:tbl>');
-  expect(xml).toContain('w:highlight');
+  expect(xml).toContain('w:fill="f4edd2"');
   expect(xml).toContain('Heading1');
   expect(xml).toContain('w:tblHeader');
   expect(xml).toContain('Consolas');

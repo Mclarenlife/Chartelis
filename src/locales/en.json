@@ -606,5 +606,9 @@
   "[文字](https://example.com)\n![描述](https://example.com/image.png)": "[Text](https://example.com)\n![Description](https://example.com/image.png)",
   "`代码`\n```js\nconst x = 1;\n```": "`code`\n```js\nconst x = 1;\n```",
   "| 标题 | 标题 |\n| --- | --- |\n| 内容 | 内容 |": "| Heading | Heading |\n| --- | --- |\n| Content | Content |",
-  "\\text{速度} = \\frac{\\text{距离}}{\\text{时间}}": "\\text{Speed} = \\frac{\\text{Distance}}{\\text{Time}}"
+  "\\text{速度} = \\frac{\\text{距离}}{\\text{时间}}": "\\text{Speed} = \\frac{\\text{Distance}}{\\text{Time}}",
+  "高亮颜色": "Highlight color",
+  "调整 ==高亮文字== 的背景颜色，不修改 Markdown 原文。": "Choose the background color for ==highlighted text== without changing the Markdown source.",
+  "自定义高亮颜色": "Custom highlight color",
+  "高亮效果预览": "Highlight preview"
 }

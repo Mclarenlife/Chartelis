@@ -54,6 +54,11 @@ try {
   await page.getByRole('button', { name: 'Show toolbar' }).click();
   await expect(page.locator('.topbar')).toBeVisible();
   expect(await page.locator('button[data-tauri-drag-region]').count()).toBe(0);
+  await page.getByRole('button', { name: 'View', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Outline', exact: true }).click();
+  await expect.poll(async () => (await page.locator('.topbar').boundingBox()).x).toBe(220);
+  const fit = await page.locator('.topbar').evaluate(el => el.querySelector('.topbar-left').getBoundingClientRect().right <= el.querySelector('.topbar-actions').getBoundingClientRect().left);
+  expect(fit).toBe(true);
   expect(errors).toEqual([]);
   console.log('PASS: Windows header layout, no branding, draggable space, window API actions, language switching, collapse/restore and persistence.');
 } finally { await browser.close(); }
