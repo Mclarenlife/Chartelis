@@ -43,6 +43,10 @@ try {
   await page.getByRole('button', { name: 'Hide toolbar' }).click();
   await expect(page.locator('.topbar')).toBeHidden();
   await expect(page.locator('.window-strip')).toHaveCSS('height', '32px');
+  const restoreTop = await page.getByRole('button', { name: 'Show toolbar' }).boundingBox();
+  const controls = await page.locator('.window-strip .window-controls').boundingBox();
+  expect(restoreTop.x).toBeGreaterThan(500);
+  expect(restoreTop.x + restoreTop.width).toBeLessThanOrEqual(controls.x);
   await page.getByRole('button', { name: 'Maximize window' }).click();
   await expect(page.getByRole('button', { name: 'Restore window' })).toBeVisible();
   await page.reload();

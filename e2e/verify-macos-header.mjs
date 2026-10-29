@@ -25,6 +25,7 @@ try {
   await page.getByRole('button', { name: '收起顶栏', exact: true }).click();
   await expect(page.locator('.topbar')).toBeHidden();
   await expect(page.locator('.window-strip')).toHaveCSS('height', '64px');
+  expect((await page.getByRole('button', { name: '展开顶栏', exact: true }).boundingBox()).x).toBeGreaterThan(650);
   await page.reload();
   await expect(page.locator('.window-strip')).toBeVisible();
   await page.getByRole('button', { name: '展开顶栏', exact: true }).click();

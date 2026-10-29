@@ -4,6 +4,21 @@ try {
   const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1100, height: 800 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:1420');
+  const sidebarToggle = page.locator('.sidebar-toggle');
+  await expect(sidebarToggle).toBeDisabled();
+  await expect(sidebarToggle).not.toHaveAttribute('title');
+  const idleStyle = await sidebarToggle.evaluate(el => {
+    const style = getComputedStyle(el);
+    return [style.backgroundColor, style.color, style.opacity];
+  });
+  const toggleBox = await sidebarToggle.boundingBox();
+  await page.mouse.move(toggleBox.x + 10, toggleBox.y + 10);
+  expect(await sidebarToggle.evaluate(el => {
+    const style = getComputedStyle(el);
+    return [style.backgroundColor, style.color, style.opacity];
+  })).toEqual(idleStyle);
+  await expect(sidebarToggle).toHaveCSS('pointer-events', 'none');
+  await expect(sidebarToggle).toHaveCSS('cursor', 'default');
   await page.keyboard.press('Control+n');
   await page.getByRole('button', { name: '切换为 Markdown 源码' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown 源码编辑器' });
@@ -57,7 +72,19 @@ try {
   expect(await scroller.evaluate(el => el.scrollTop)).toBe(100);
   await page.getByRole('button', { name: '收起顶栏' }).click();
   await expect(page.locator('.topbar')).toBeHidden();
+  expect((await page.getByRole('button', { name: '展开顶栏' }).boundingBox()).x).toBeGreaterThan(1700);
   expect((await scroller.boundingBox()).y).toBe(0);
+  const collapseBottom = page.getByRole('button', { name: '收起底栏' });
+  expect((await collapseBottom.boundingBox()).x).toBeGreaterThan(1700);
+  await collapseBottom.click();
+  await expect(page.locator('.statusbar')).toBeHidden();
+  expect((await page.getByRole('button', { name: '展开底栏' }).boundingBox()).x).toBeGreaterThan(1700);
+  await page.reload();
+  await expect(page.locator('.statusbar')).toBeHidden();
+  await expect(page.locator('.topbar')).toBeHidden();
+  await page.screenshot({ path: 'artifacts/right-restore-buttons.png' });
+  await page.getByRole('button', { name: '展开底栏' }).click();
+  await expect(page.locator('.statusbar')).toBeVisible();
   await page.getByRole('button', { name: '展开顶栏' }).click();
   await expect(page.locator('.topbar')).toBeVisible();
   expect(errors).toEqual([]);
