@@ -45,7 +45,7 @@ button, input, a { -webkit-app-region: no-drag; }
 button { transition: background-color .15s, color .15s; }
 svg { flex-shrink: 0; }
 kbd { font-family: inherit; font-size: 10px; color: var(--muted); white-space: nowrap; }
-.app { --header-fade:linear-gradient(to bottom, var(--paper) 0%, var(--paper) 20%, color-mix(in srgb, var(--paper) 96%, transparent) 40%, color-mix(in srgb, var(--paper) 82%, transparent) 60%, color-mix(in srgb, var(--paper) 48%, transparent) 80%, color-mix(in srgb, var(--paper) 18%, transparent) 92%, transparent 100%); position:relative; display: flex; flex-direction: column; height: 100dvh; min-width: 640px; background: var(--paper); color: var(--text); }
+.app { --header-fade:linear-gradient(to bottom, color-mix(in srgb, var(--paper) 88%, transparent) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 20%, color-mix(in srgb, var(--paper) 92%, transparent) 40%, color-mix(in srgb, var(--paper) 86%, transparent) 60%, color-mix(in srgb, var(--paper) 64%, transparent) 80%, color-mix(in srgb, var(--paper) 32%, transparent) 92%, transparent 100%); position:relative; display: flex; flex-direction: column; height: 100dvh; min-width: 640px; background: var(--paper); color: var(--text); }
 .workspace-layout { display:flex; flex:1; min-height:0; }
 /* Keep the viewport behind the header; the initial inset scrolls with the page. */
 .app .writing-scroll { --content-top-inset:var(--topbar-inset, 0px); scroll-padding-top:calc(var(--topbar-inset, 0px) + 12px); }

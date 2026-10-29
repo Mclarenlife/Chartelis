@@ -1,6 +1,6 @@
 [package]
 name = "chartelis"
-version = "0.1.7"
+version = "0.1.8"
 description = "A quiet space for words. A minimal Markdown editor."
 authors = ["Chartelis"]
 edition = "2021"
