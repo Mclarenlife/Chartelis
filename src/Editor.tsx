@@ -13,7 +13,7 @@ import { $prose, callCommand, insert } from '@milkdown/kit/utils';
 import { highlightMark, highlightRemark } from './highlight';
 import { mathPlugins } from './math';
 import { latexCompatibility } from './latex-preference';
-import { wrapLatex } from './latex-delimiters';
+import { latexForRendering, wrapLatex } from './latex-delimiters';
 import { textColorMark, textColorRemark, normalizeColor, colorStringify } from './text-color';
 import { DOMSerializer } from '@milkdown/kit/prose/model';
 import katex from 'katex';
@@ -76,8 +76,8 @@ const MarkdownEditor = forwardRef<EditorHandle, Props>(function MarkdownEditor(p
         const rendered = document.createElement('span'); rendered.className = 'math-render';
         const delimiter = element.dataset.latexDelimiter;
         if ((delimiter === 'paren' || delimiter === 'bracket') && !latexCompatibility()) {
-          element.classList.add('math-literal'); rendered.textContent = wrapLatex(element.dataset.math || '', delimiter);
-        } else rendered.innerHTML = katex.renderToString(element.dataset.math || '', { displayMode: block || delimiter === 'bracket', throwOnError: false, trust: false });
+          element.classList.add('math-literal'); rendered.textContent = wrapLatex(element.dataset.math || '', delimiter, element.dataset.latexDoubled === 'true');
+        } else rendered.innerHTML = katex.renderToString(latexForRendering(element.dataset.math || '', element.dataset.latexDoubled === 'true'), { displayMode: block || delimiter === 'bracket', throwOnError: false, trust: false });
         element.replaceChildren(rendered);
       });
       return container.innerHTML;

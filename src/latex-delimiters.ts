@@ -2,8 +2,18 @@ import type { Processor } from 'unified';
 import { latexCompatibility } from './latex-preference';
 
 export type LatexDelimiter = 'paren' | 'bracket';
-export function wrapLatex(value: string, delimiter: LatexDelimiter) {
-  return delimiter === 'bracket' ? `\\[${value}\\]` : `\\(${value}\\)`;
+export function latexForRendering(value: string, doubled: boolean) {
+  // Some clipboard sources escape every slash, including those in commands.
+  // Preserve mixed/raw TeX and remove this extra layer for rendering only.
+  if (doubled && /\\\\[A-Za-z]{2,}/.test(value) &&
+      (value.match(/\\+/g) ?? []).every(run => run.length % 2 === 0)) {
+    return value.replace(/\\\\/g, '\\');
+  }
+  return value;
+}
+export function wrapLatex(value: string, delimiter: LatexDelimiter, doubled = false) {
+  const slash = doubled ? '\\\\' : '\\';
+  return slash + (delimiter === 'bracket' ? '[' : '(') + value + slash + (delimiter === 'bracket' ? ']' : ')');
 }
 
 // Parse before Markdown processes backslash escapes/emphasis. The tokenizer only
@@ -17,6 +27,7 @@ export function remarkLatexDelimiters(this: Processor) {
     concrete: block,
     tokenize(this: any, effects: any, ok: any, nok: any) {
       let close = 0;
+      let doubled = false;
       const token = block ? 'chartelisLatexFlow' : 'chartelisLatex';
       return start;
       function start(code: number | null): any {
@@ -24,6 +35,7 @@ export function remarkLatexDelimiters(this: Processor) {
         effects.enter(token); effects.enter('chartelisLatexData'); effects.consume(code); return opening;
       }
       function opening(code: number | null): any {
+        if (!doubled && code === 92) { doubled = true; effects.consume(code); return opening; }
         if (block ? code !== 91 : code !== 40 && code !== 91) return nok(code);
         close = code === 40 ? 41 : 93;
         effects.consume(code); return body;
@@ -45,8 +57,12 @@ export function remarkLatexDelimiters(this: Processor) {
         effects.enter('chartelisLatexData'); return body(code);
       }
       function afterSlash(code: number | null): any {
+        if (!doubled && code === close) { effects.consume(code); return finish; }
+        if (code === 92) { effects.consume(code); return doubled ? afterPair : body; }
+        return body(code);
+      }
+      function afterPair(code: number | null): any {
         if (code === close) { effects.consume(code); return finish; }
-        if (code === 92) { effects.consume(code); return body; }
         return body(code);
       }
       function finish(code: number | null): any {
@@ -59,7 +75,9 @@ export function remarkLatexDelimiters(this: Processor) {
   (data.micromarkExtensions ||= []).push({ text: { 92: construct(false) }, flow: { 92: construct(true) } });
   function enter(this: any, token: any) {
     const raw = this.sliceSerialize(token).trimEnd();
-    this.enter({ type: token.type === 'chartelisLatexFlow' ? 'latexMath' : 'latexInlineMath', value: raw.slice(2, -2), delimiter: raw[1] === '[' ? 'bracket' : 'paren' }, token);
+    const doubled = raw.startsWith('\\\\');
+    const prefix = doubled ? 3 : 2;
+    this.enter({ type: token.type === 'chartelisLatexFlow' ? 'latexMath' : 'latexInlineMath', value: raw.slice(prefix, -prefix), doubled, delimiter: raw[prefix - 1] === '[' ? 'bracket' : 'paren' }, token);
     this.buffer();
   }
   function exit(this: any, token: any) { this.resume(); this.exit(token); }
@@ -68,8 +86,8 @@ export function remarkLatexDelimiters(this: Processor) {
     exit: { chartelisLatex: exit, chartelisLatexFlow: exit },
   });
   (data.toMarkdownExtensions ||= []).push({ handlers: {
-    latexInlineMath: (node: any) => wrapLatex(node.value, node.delimiter),
-    latexMath: (node: any) => wrapLatex(node.value, 'bracket'),
+    latexInlineMath: (node: any) => wrapLatex(node.value, node.delimiter, node.doubled),
+    latexMath: (node: any) => wrapLatex(node.value, 'bracket', node.doubled),
   } });
   return (tree: any) => {
     function visit(parent: any) {
@@ -96,11 +114,12 @@ export function resolveLatexDelimiters(options: { enabled?: boolean } = {}) {
         if (node.type !== 'latexMath' && node.type !== 'latexInlineMath') { visit(node); return node; }
         const block = node.type === 'latexMath';
         if (!enabled) {
-          const text = { type: 'text', value: wrapLatex(node.value, node.delimiter) };
+          const text = { type: 'text', value: wrapLatex(node.value, node.delimiter, node.doubled) };
           return block ? { type: 'paragraph', children: [text] } : text;
         }
-        const code = { type: 'element', tagName: 'code', properties: { className: ['language-math', node.delimiter === 'bracket' ? 'math-display' : 'math-inline'] }, children: [{ type: 'text', value: node.value }] };
-        return { type: block ? 'math' : 'inlineMath', value: node.value, data: block ? { hName: 'pre', hChildren: [code] } : { hName: 'code', hProperties: code.properties, hChildren: code.children } };
+        const value = latexForRendering(node.value, node.doubled);
+        const code = { type: 'element', tagName: 'code', properties: { className: ['language-math', node.delimiter === 'bracket' ? 'math-display' : 'math-inline'] }, children: [{ type: 'text', value }] };
+        return { type: block ? 'math' : 'inlineMath', value, data: block ? { hName: 'pre', hChildren: [code] } : { hName: 'code', hProperties: code.properties, hChildren: code.children } };
       });
     }
     visit(tree);

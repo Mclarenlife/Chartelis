@@ -13,6 +13,17 @@ vi.stubGlobal('localStorage', { setItem() {} });
 const parse = (source: string) => parser.runSync(parser.parse(source)) as any;
 afterEach(() => setLatexCompatibility(false));
 
+it('renders paired double delimiters without changing inner commands or matrix rows', async () => {
+  const source = '\\\\(k=4\\pi\\\\)\n\n\\\\[\n\\begin{matrix}a\\\\b\\end{matrix}\n\\\\]';
+  expect(await markdownHtml(source)).toContain('\\\\(k=4\\pi\\\\)');
+  setLatexCompatibility(true);
+  const html = await markdownHtml(source);
+  expect(html.match(/class="katex"/g)).toHaveLength(2);
+  expect(html).not.toContain('katex-error');
+  expect(renderAIMarkdown(source)).toContain('katex-display');
+  expect(await markdownHtml('\\\\(k=4\\\\pi\\\\)')).toContain('π');
+});
+
 it('preserves LaTeX before Markdown escapes and emphasis are processed', () => {
   const source = String.raw`Given \(k=4\pi+x_i*y_j\), then \(y=2\).`;
   const nodes = parse(source).children[0].children;

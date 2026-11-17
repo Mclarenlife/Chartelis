@@ -1,7 +1,8 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1100, height: 800 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1100, height: 800 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:1420');
   const sidebarToggle = page.locator('.sidebar-toggle');
@@ -19,7 +20,7 @@ try {
   })).toEqual(idleStyle);
   await expect(sidebarToggle).toHaveCSS('pointer-events', 'none');
   await expect(sidebarToggle).toHaveCSS('cursor', 'default');
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   await page.getByRole('button', { name: '切换为 Markdown 源码' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown 源码编辑器' });
   await source.fill('# 覆盖式顶栏\n\n' + Array.from({ length: 40 }, (_, i) => `段落 ${i}：文字从透明渐变顶栏下方经过，保持连续的阅读空间。`).join('\n\n'));

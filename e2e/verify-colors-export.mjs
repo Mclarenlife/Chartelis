@@ -1,10 +1,11 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1100, height: 900 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1100, height: 900 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://127.0.0.1:1420/'); await page.keyboard.press('Control+n');
+  await page.goto('http://127.0.0.1:1420/'); page = await openDocumentWindow(page);
   const rich = page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
   await rich.click(); await page.keyboard.type('Color test'); await page.keyboard.press('Shift+Home');
   await rich.click({ button: 'right' });

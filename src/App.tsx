@@ -27,6 +27,7 @@ import type { Heading } from './Editor';
 import DocumentSession, { type SessionHandle, type EditorMode } from './DocumentSession';
 import { countCharacters, createDocument, isDirty, markSaved, storeDrafts, type DocumentEntry } from './document';
 import { restoreWorkspace, storeWorkspace, emptySession } from './workspace';
+import { openDocumentWindow, restoreDocumentWindows, secondaryWindow, workspaceKey } from './document-windows';
 import { desktop, isCancelled, openDocument, saveDocument, openPath, readDocument } from './files';
 
 function Modal({ children, title, onClose }: { children: ReactNode; title: string; onClose(): void }) {
@@ -46,7 +47,7 @@ export default function App() {
   useLanguage();
   const [chooseLanguage, setChooseLanguage] = useState(needsLanguageChoice);
   const [aiOpen, setAiOpen] = useState(false);
-  const [initialWorkspace] = useState(restoreWorkspace);
+  const [initialWorkspace] = useState(() => restoreWorkspace(workspaceKey));
   const [docs, setDocs] = useState<DocumentEntry[]>(initialWorkspace.docs);
   const [activeId, setActiveId] = useState(initialWorkspace.activeId);
   const docsRef = useRef(docs);
@@ -108,6 +109,12 @@ export default function App() {
     setDocs(next);
   }, []);
   const notify = useCallback((text: string, error = false) => setToast({ text, error }), []);
+  const restoring = useRef(false);
+  useEffect(() => {
+    if (restoring.current) return;
+    restoring.current = true;
+    void restoreDocumentWindows().catch(error => notify(String(error), true));
+  }, [notify]);
   const externalError = useCallback((text: string) => notify(text, true), [notify]);
   const { paths: externalPaths, revision: externalRevision } = useExternalFiles(externalError);
   const flush = useCallback(() => {
@@ -141,7 +148,7 @@ export default function App() {
     clearTimeout(persistTimer.current);
     try {
       storeWorkspace({ version: 1, activeId: activeRef.current, docs: docsRef.current,
-        sessions: Object.fromEntries(docsRef.current.map(doc => [doc.id, sessions.current.get(doc.id)?.snapshot() ?? initialWorkspace.sessions[doc.id] ?? emptySession()])) });
+        sessions: Object.fromEntries(docsRef.current.map(doc => [doc.id, sessions.current.get(doc.id)?.snapshot() ?? initialWorkspace.sessions[doc.id] ?? emptySession()])) }, workspaceKey);
       setDraftWarning(false); return true;
     } catch { setDraftWarning(true); return false; }
   }, [initialWorkspace]);
@@ -163,24 +170,19 @@ export default function App() {
     finally { busyRef.current = false; setBusy(false); }
   };
 
+  const lastPreferences = useRef<Record<string, string>>({});
   useEffect(() => {
-
     try {
-      localStorage.setItem('chartelis.listStyle', listStyle);
-      localStorage.setItem('chartelis.toolbar', JSON.stringify(toolbar));
-      localStorage.setItem('chartelis.recent', JSON.stringify(recent));
-      localStorage.setItem('chartelis.theme', theme);
-      localStorage.setItem('chartelis.writingTheme', writingTheme);
-      localStorage.setItem('chartelis.ink', ink);
-      localStorage.setItem('chartelis.countOptions', JSON.stringify(countOptions));
-      localStorage.setItem('chartelis.font', font);
-      localStorage.setItem('chartelis.highlightColor', highlightColor);
-      localStorage.setItem('chartelis.fontSize', String(fontSize));
-      localStorage.setItem('chartelis.contentWidth', String(contentWidth));
-      localStorage.setItem('chartelis.outline', outlinePosition);
-      localStorage.setItem('chartelis.sidebar', String(sidebarOpen));
-      localStorage.setItem('chartelis.topbar', String(topbarVisible));
-      localStorage.setItem('chartelis.statusbar', String(statusVisible));
+      const values = {
+        listStyle, toolbar: JSON.stringify(toolbar), recent: JSON.stringify(recent), theme, writingTheme, ink,
+        countOptions: JSON.stringify(countOptions), font, highlightColor, fontSize: String(fontSize),
+        contentWidth: String(contentWidth), outline: outlinePosition, sidebar: String(sidebarOpen),
+        topbar: String(topbarVisible), statusbar: String(statusVisible),
+      };
+      for (const [key, value] of Object.entries(values)) {
+        if (lastPreferences.current[key] !== value) localStorage.setItem('chartelis.' + key, value);
+      }
+      lastPreferences.current = values;
     } catch { /* Editing works without preference storage. */ }
   }, [highlightColor, writingTheme, ink, countOptions, theme, font, fontSize, contentWidth, outlinePosition, sidebarOpen, listStyle, toolbar, recent, topbarVisible, statusVisible]);
   useEffect(() => {
@@ -207,12 +209,7 @@ export default function App() {
     const content = template ? renderTemplate(template) : null;
     const untitled = createDocument(content?.filename ?? tf`未命名${docsRef.current.filter(doc => /^(未命名|Untitled)/.test(doc.name)).length + 1}.md`, content?.markdown ?? '');
     if (content) untitled.savedMarkdown = '';
-    updateDocs(current => [...current, untitled]);
-    activeRef.current = untitled.id;
-    setActiveId(untitled.id);
-    setHeadings([]);
-    setSearch('');
-    setSidebarTab('files');
+    void openDocumentWindow(untitled).catch(error => notify(String(error), true));
   };
   const runPluginCommand = (pluginId: string, command: PluginCommand) => {
     if (readOnly || busyRef.current || !enabledPlugins.some(plugin => plugin.id === pluginId && plugin.commands.includes(command))) return;
@@ -282,7 +279,8 @@ export default function App() {
       if (docsRef.current.some(doc => (target === 'app' || doc.id === target) && isDirty(doc))) return;
     }
     if (target === 'app') {
-      if (!saveFirst) { try { storeDrafts([]); } catch { /* closing explicitly discards */ } }
+      if (secondaryWindow) localStorage.removeItem(workspaceKey);
+      else if (!saveFirst) { try { storeDrafts([]); } catch { /* closing explicitly discards */ } }
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().destroy();
     } else removeDocument(target);
@@ -446,6 +444,7 @@ export default function App() {
         handlers.current.flush();
         const persisted = handlers.current.persist();
         if (busyRef.current || !persisted) { event.preventDefault(); setCloseTarget('app'); }
+        else if (secondaryWindow && !docsRef.current.some(isDirty)) localStorage.removeItem(workspaceKey);
       });
       if (disposed) unlisten(); else dispose = unlisten;
     }).catch(error => notify(tf`窗口关闭保护未能启用：${String(error)}`, true));

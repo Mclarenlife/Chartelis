@@ -1,3 +1,4 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 import http from 'node:http';
 const calls = [];
@@ -24,10 +25,10 @@ const server = http.createServer(async (req, res) => {
 await new Promise(resolve=>server.listen(1431,'127.0.0.1',resolve));
 const browser = await chromium.launch({channel:'msedge',headless:true});
 try {
-  const page = await browser.newPage({locale:'zh-CN',viewport:{width:1320,height:960}});
+  let page = await browser.newPage({locale:'zh-CN',viewport:{width:1320,height:960}});
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:1420');
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   await page.getByRole('textbox',{name:'Markdown 编辑器',exact:true}).fill('文稿原文保持不变');
   await page.getByRole('button',{name:'AI 助手',exact:true}).click();
   const panel=page.getByRole('complementary',{name:'AI 助手'});

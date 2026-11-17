@@ -1,10 +1,11 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(() => {
+  await page.context().addInitScript(() => {
     const file = (name, text) => ({ kind: 'file', name, getFile: async () => new File([text], name), isSameEntry: async other => other.name === name });
     const folder = (name, children) => ({ kind: 'directory', name, async *values() { yield* children; } });
     const docs = folder('测试文稿', [file('初见.md', '# 初见\n\n文件夹里的文稿'), file('ignore.png', 'not markdown'), folder('子文件夹', [file('子文稿.md', '# 子文稿')])]);
@@ -23,7 +24,7 @@ try {
   }
   await page.screenshot({ path: 'artifacts/topbar-compact-640.png', animations: 'disabled' });
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   const rich = page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
   await rich.click(); await page.keyboard.type('abc');
   await menu('帮助', '字符表');

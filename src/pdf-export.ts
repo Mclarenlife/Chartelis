@@ -42,11 +42,50 @@ interface TextLine extends KeepTogether {
   family: string; bold: boolean; italic: boolean; color: number[];
 }
 
+// html2canvas paints an inline background using one bounding box. When a
+// mark wraps, that box also covers unmarked text on its first and last lines.
+// Give the renderer one background per visual fragment on the export copy.
+function splitWrappedHighlights(surface: HTMLElement) {
+  const range = document.createRange();
+  for (const mark of surface.querySelectorAll('mark')) {
+    if (mark.getClientRects().length < 2) continue;
+    const background = getComputedStyle(mark).backgroundColor;
+    const walker = document.createTreeWalker(mark, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+    for (const node of nodes) {
+      let offset = 0, start = 0, lastTop: number | undefined;
+      const fragment = document.createDocumentFragment();
+      const append = (end: number) => {
+        if (start === end) return;
+        const span = document.createElement('span');
+        span.style.backgroundColor = background;
+        span.style.borderRadius = getComputedStyle(mark).borderRadius;
+        span.textContent = node.data.slice(start, end);
+        fragment.append(span);
+        start = end;
+      };
+      for (const char of node.data) {
+        range.setStart(node, offset);
+        range.setEnd(node, offset + char.length);
+        const rect = range.getBoundingClientRect();
+        if (rect.width && lastTop !== undefined && Math.abs(rect.top - lastTop) > .5) append(offset);
+        if (rect.width) lastTop = rect.top;
+        offset += char.length;
+      }
+      append(offset);
+      node.replaceWith(fragment);
+    }
+    mark.style.backgroundColor = 'transparent';
+  }
+}
+
 /** The browser supplies the visual layer; selectable text is positioned over it. */
 export async function textPdf(surface: HTMLElement, title: string): Promise<Blob> {
   const base = import.meta.env.BASE_URL;
   const regularUrl = `${base}fonts/NotoSansSC-Regular.ttf`, boldUrl = `${base}fonts/NotoSansSC-Bold.ttf`;
   await document.fonts.ready;
+  splitWrappedHighlights(surface);
   const bounds = surface.getBoundingClientRect();
   const canvas = document.createElement('canvas'), context = canvas.getContext('2d')!;
   const lines: TextLine[] = [];

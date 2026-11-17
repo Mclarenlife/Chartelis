@@ -1,8 +1,9 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 960 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 960 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:1420/');
@@ -16,7 +17,7 @@ try {
   assert.deepEqual(order, ['bold', 'italic', 'strike', 'inlineCode', 'h2', 'highlight', 'quote']);
   await page.screenshot({ path: 'artifacts/toolbar-settings.png', animations: 'disabled' });
   await page.getByRole('button', { name: '关闭对话框' }).click();
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   const editor = page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
   await editor.click();
   await page.keyboard.type('Toolbar selection test');

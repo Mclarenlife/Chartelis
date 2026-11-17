@@ -1,10 +1,11 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 880 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 880 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:1420');
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   await page.getByRole('button', { name: '切换为 Markdown 源码' }).click();
   const markdown = '# 开始\n\n==测试高亮==\n\n' + Array.from({ length: 12 }, (_, i) => `## 章节 ${i}\n\n${('这是正文，测试大纲稳定定位。\n\n').repeat(8)}`).join('') + '## 最后标题\n';
   await page.getByRole('textbox', { name: 'Markdown 源码编辑器' }).fill(markdown);

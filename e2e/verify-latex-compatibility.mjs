@@ -1,11 +1,16 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const sample = '# 公式兼容\n\n行内公式 \\(k=4\\pi+x_i\\)，标准公式 $x^2$。\n\n\\[\n\\frac{1}{2}\n\n+\\sqrt{x}\n\\]\n\n`\\(code\\)`\n\n结尾';
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1200, height: 900 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1200, height: 900 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:1420');
-  await page.keyboard.press('Control+n');
+  const original = page;
+  const originalEditor = original.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
+  await originalEditor.fill('原窗口的未保存文稿');
+  page = await openDocumentWindow(original);
+  await expect(originalEditor).toHaveText('原窗口的未保存文稿');
   await page.getByRole('button', { name: '切换为 Markdown 源码' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown 源码编辑器' });
   await source.click(); await page.keyboard.press('Control+a'); await page.keyboard.insertText(sample);
@@ -51,6 +56,24 @@ try {
   await exportAndCheck('PNG 图片', 1, 2, 'disabled');
   await page.getByRole('button', { name: '切换为 Markdown 源码' }).click();
   expect((await source.locator('.cm-line').allTextContents()).join('\n')).toBe(edited);
+  await source.fill('');
+  await page.getByRole('button', { name: '切换为即时预览' }).click();
+  await toggle(true);
+  await editor.click();
+  await page.keyboard.type('before \\\\(k=4\\pi\\\\) after');
+  await expect(editor.locator('.katex')).toHaveCount(1);
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('\\\\[');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('x^2');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('\\\\]');
+  await expect(editor.locator('.katex-display')).toHaveCount(1);
+  await original.reload();
+  await expect(originalEditor).toHaveText('原窗口的未保存文稿');
+  await page.reload();
+  await expect(editor.locator('.katex')).toHaveCount(2);
   expect(errors).toEqual([]);
   async function exportAndCheck(format, math, literal, state) {
     await page.evaluate(() => {

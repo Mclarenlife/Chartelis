@@ -19,14 +19,14 @@ export function sanitizeSession(value: any): SessionSnapshot {
   const view = (item: any) => ({ cursor: { anchor: Math.floor(finite(item?.cursor?.anchor)), head: Math.floor(finite(item?.cursor?.head)) }, scroll: finite(item?.scroll) });
   return { mode: value?.mode === 'source' ? 'source' : 'preview', preview: view(value?.preview), source: view(value?.source) };
 }
-export function storeWorkspace(workspace: Workspace) {
+export function storeWorkspace(workspace: Workspace, key = WORKSPACE_KEY) {
   // FileSystemFileHandle is not JSON serializable; desktop paths and conflict baselines are.
   const docs = workspace.docs.map(({ handle: _handle, ...doc }) => doc);
-  localStorage.setItem(WORKSPACE_KEY, JSON.stringify({ ...workspace, docs }));
+  localStorage.setItem(key, JSON.stringify({ ...workspace, docs }));
 }
-export function restoreWorkspace(): Workspace {
+export function restoreWorkspace(key = WORKSPACE_KEY): Workspace {
   try {
-    const saved = JSON.parse(localStorage.getItem(WORKSPACE_KEY) || 'null');
+    const saved = JSON.parse(localStorage.getItem(key) || 'null');
     if (saved?.version === 1 && Array.isArray(saved.docs)) {
       const seen = new Set<string>();
       const docs: DocumentEntry[] = saved.docs.filter((doc: any) => {
@@ -40,6 +40,10 @@ export function restoreWorkspace(): Workspace {
         sessions: Object.fromEntries(docs.map(doc => [doc.id, sanitizeSession(saved.sessions?.[doc.id])])) };
     }
   } catch { /* Recover older drafts when a workspace is unavailable or malformed. */ }
+  if (key !== WORKSPACE_KEY) {
+    const doc = createDocument();
+    return { version: 1, docs: [doc], activeId: doc.id, sessions: {} };
+  }
   const drafts = restoreDrafts();
   const docs = drafts.length ? drafts : [createDocument('初见 Chartelis.md', welcome)];
   return { version: 1, docs, activeId: docs[0].id, sessions: {} };

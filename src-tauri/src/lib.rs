@@ -9,6 +9,26 @@ use tauri_plugin_fs::FsExt;
 #[derive(Default)]
 struct PendingFiles(Mutex<Vec<String>>);
 
+// Async so WebView2 creation runs outside its window event callback on Windows.
+#[tauri::command]
+async fn open_document_window(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    if id.len() != 36 || !id.bytes().enumerate().all(|(i, b)| {
+        if matches!(i, 8 | 13 | 18 | 23) { b == b'-' } else { b.is_ascii_hexdigit() }
+    }) { return Err("Invalid document window ID".into()); }
+    let label = format!("document-{id}");
+    if app.get_webview_window(&label).is_some() { return Ok(()); }
+    let mut config = app.config().app.windows[0].clone();
+    config.label = label;
+    let window = tauri::WebviewWindowBuilder::from_config(&app, &config)
+        .map_err(|error| error.to_string())?.build().map_err(|error| error.to_string())?;
+    let _ = window.set_focus();
+    Ok(())
+}
+
+fn external_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    app.get_webview_window("main").or_else(|| app.webview_windows().into_iter().min_by(|a, b| a.0.cmp(&b.0)).map(|(_, window)| window))
+}
+
 fn markdown_path(path: &Path) -> Option<PathBuf> {
     let extension = path.extension()?.to_str()?.to_ascii_lowercase();
     if !["md", "markdown", "mdown"].contains(&extension.as_str()) || !path.is_file() { return None; }
@@ -27,8 +47,8 @@ fn queue_files(app: &tauri::AppHandle, paths: impl IntoIterator<Item = PathBuf>)
         }
     }
     drop(queue);
-    let _ = app.emit("chartelis-open-files", ());
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = external_window(app) {
+        let _ = app.emit_to(window.label(), "chartelis-open-files", ());
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
@@ -36,7 +56,8 @@ fn queue_files(app: &tauri::AppHandle, paths: impl IntoIterator<Item = PathBuf>)
 }
 
 #[tauri::command]
-fn take_pending_files(state: tauri::State<PendingFiles>) -> Vec<String> {
+fn take_pending_files(window: tauri::WebviewWindow, state: tauri::State<PendingFiles>) -> Vec<String> {
+    if external_window(window.app_handle()).is_none_or(|target| target.label() != window.label()) { return vec![]; }
     std::mem::take(&mut *state.0.lock().unwrap_or_else(|error| error.into_inner()))
 }
 
@@ -55,7 +76,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![take_pending_files, association::is_default_markdown_app, association::configure_markdown_default, language::installation_language, ai_credentials::ai_get_key, ai_credentials::ai_set_key, ai_credentials::ai_delete_key])
+        .invoke_handler(tauri::generate_handler![open_document_window, take_pending_files, association::is_default_markdown_app, association::configure_markdown_default, language::installation_language, ai_credentials::ai_get_key, ai_credentials::ai_set_key, ai_credentials::ai_delete_key])
         .setup(|app| {
             queue_files(app.handle(), std::env::args_os().skip(1).map(PathBuf::from));
             Ok(())

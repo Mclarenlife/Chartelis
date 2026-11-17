@@ -1,10 +1,11 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:1420/');
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   const rich = page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
   await rich.click(); await page.keyboard.type('Hello hello HELLO');
   await page.keyboard.press('Control+f');
@@ -78,12 +79,12 @@ try {
   await page.screenshot({ path: 'artifacts/search-dark.png' });
   await page.setViewportSize({ width: 720, height: 700 });
   expect(await page.locator('.topbar').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   await page.getByRole('button', { name: '切换为 Markdown 源码' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown 源码编辑器' });
   await source.fill(Array.from({ length: 400 }, (_, i) => `line ${i}`).join('\n') + '\nunique-needle');
   await source.press('Control+Home');
-  await page.keyboard.press('Control+f'); await query.fill('unique-needle');
+  await page.keyboard.press('Control+f'); await page.getByRole('textbox', { name: '查找内容' }).fill('unique-needle');
   await expect(page.locator('.source-scroll:not([hidden]) .search-current')).toBeInViewport();
   expect(await page.locator('.source-scroll:not([hidden])').evaluate(el => el.scrollTop)).toBeGreaterThan(1000);
   expect(errors).toEqual([]);

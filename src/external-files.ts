@@ -28,9 +28,9 @@ export function useExternalFiles(onError: (message: string) => void) {
         if (incoming.length) setRevision(value => value + 1);
       } catch (error) { onError(tf`接收文稿失败：${String(error)}`); }
     };
-    void import('@tauri-apps/api/event').then(async ({ listen }) => {
+    void import('@tauri-apps/api/window').then(async ({ getCurrentWindow }) => {
       if (cancelled) return;
-      const stop = await listen('chartelis-open-files', () => void drain());
+      const stop = await getCurrentWindow().listen('chartelis-open-files', () => void drain());
       if (cancelled) { stop(); return; }
       unlisten = stop;
       await drain();

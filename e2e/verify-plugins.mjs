@@ -1,8 +1,9 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
+  let page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:1420/');
@@ -22,14 +23,16 @@ try {
   await page.screenshot({ path: 'artifacts/plugins-settings.png', animations: 'disabled' });
   await close();
   await menu('文件', '从模板新建');
-  await page.getByRole('menuitem', { name: '会议纪要 · 写作工具箱' }).click();
-  const rich = page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
+  page = await openDocumentWindow(page, () => page.getByRole('menuitem', { name: '会议纪要 · 写作工具箱' }).click());
+  let rich = page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
   await expect(rich).toContainText('议题');
   await expect(page.locator('.save-state')).toHaveText('尚未保存');
   await page.reload();
   await expect(rich).toContainText('议题');
   await expect(page.locator('html')).toHaveCSS('--paper', '#25272b');
-  await page.keyboard.press('Control+n');
+  const templatePage = page;
+  page = await openDocumentWindow(page);
+  rich = page.getByRole('textbox', { name: 'Markdown 编辑器', exact: true });
   await rich.click(); await page.keyboard.type('hello world'); await page.keyboard.press('Shift+Home');
   await command('转为大写');
   await expect(rich).toHaveText('HELLO WORLD');
@@ -75,9 +78,7 @@ try {
   await page.getByRole('button', { name: '确认卸载' }).click();
   await expect(page.locator('.plugin-card')).toHaveCount(0);
   await close();
-  await page.keyboard.press('Control+p');
-  await expect(page.getByRole('dialog', { name: '已打开的文稿' })).toContainText('会议纪要');
-  await close();
+  await expect(templatePage.getByRole('textbox', { name: 'Markdown 编辑器', exact: true })).toContainText('议题');
   await page.reload(); await settings(); await expect(page.locator('.plugin-card')).toHaveCount(0);
   // Storage errors must not leave an apparently installed but non-persistent plugin.
   await page.evaluate(() => {

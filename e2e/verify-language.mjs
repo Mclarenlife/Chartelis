@@ -1,11 +1,12 @@
+import { openDocumentWindow } from './document-window.mjs';
 import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1100, height: 900 } });
+  let page = await browser.newPage({ locale: 'en-US', viewport: { width: 1100, height: 900 } });
   const errors=[]; page.on('pageerror', error=>errors.push(error.message));
   await page.goto('http://127.0.0.1:1420/');
   await expect(page.getByRole('button',{name:'File',exact:true})).toBeVisible();
-  await page.keyboard.press('Control+n');
+  page = await openDocumentWindow(page);
   const editor=page.getByRole('textbox',{name:'Markdown editor',exact:true});
   await editor.click(); await page.keyboard.insertText('Keep my words 你好');
   await page.getByRole('button',{name:'Settings',exact:true}).click();
